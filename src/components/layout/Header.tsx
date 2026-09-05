@@ -14,9 +14,9 @@ export const Header: React.FC<HeaderProps> = ({ viewMode, onViewModeChange }) =>
         {/* Logo & Version */}
         <div className="flex items-center gap-3">
           <div className="w-7 h-7 rounded bg-primary-container flex items-center justify-center text-on-primary font-bold text-sm shadow-md shadow-primary/20">
-            UN
+            PF
           </div>
-          <span className="text-sm font-semibold tracking-tight text-on-surface font-headline-sm">Sin Nombre</span>
+          <span className="text-sm font-semibold tracking-tight text-on-surface font-headline-sm">Proyecto Funk</span>
           <span className="px-1.5 py-0.5 bg-surface-container-highest text-on-surface-variant rounded text-[10px] font-mono uppercase tracking-wider">
             v1.0
           </span>
