@@ -361,8 +361,8 @@ export const FUNKO_GROOVER_CONFIG: Funko2DRenderConfig = {
         }
       },
       {
-        "id": "brazo-der-mano-espejo",
-        "name": "Brazo Derecho Mano (Mano en código Java)",
+        "id": "brazo-der-hombro",
+        "name": "Brazo Derecho Hombro",
         "source": {
           "x": 1320,
           "y": 270,
@@ -381,8 +381,8 @@ export const FUNKO_GROOVER_CONFIG: Funko2DRenderConfig = {
         "rotateDeg": 180
       },
       {
-        "id": "brazo-der-hombro",
-        "name": "Brazo Derecho Hombro (Hombro en código Java)",
+        "id": "brazo-der-mano",
+        "name": "Brazo Derecho Mano",
         "source": {
           "x": 1440,
           "y": 270,

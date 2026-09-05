@@ -8,9 +8,10 @@ interface FunkoViewer3DProps {
   skinCanvas: HTMLCanvasElement | null;
   rendered2DCanvas?: HTMLCanvasElement | null;
   parts?: PartTransformation[];
+  skinFormat?: 'legacy' | 'standard';
 }
 
-export const FunkoViewer3D: React.FC<FunkoViewer3DProps> = ({ skinCanvas, rendered2DCanvas, parts }) => {
+export const FunkoViewer3D: React.FC<FunkoViewer3DProps> = ({ skinCanvas, rendered2DCanvas, parts, skinFormat = 'standard' }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const [autoRotate, setAutoRotate] = useState(true);
   const [wireframe, setWireframe] = useState(false);
@@ -242,7 +243,7 @@ export const FunkoViewer3D: React.FC<FunkoViewer3DProps> = ({ skinCanvas, render
       makeMat(getTextureFrom2DSheet('cabeza-derecha', 90) || getPartTexture('cabeza-derecha', { x: 480, y: 136, w: 236, h: 134, rot: -90 })), // Right
       makeMat(getTextureFrom2DSheet('cabeza-izquierda', -90) || getPartTexture('cabeza-izquierda', { x: 0, y: 136, w: 236, h: 134, rot: 90 })),   // Left
       makeMat(getTextureFrom2DSheet('cabeza-arriba', 0) || getPartTexture('cabeza-arriba', { x: 241, y: 0, w: 236, h: 134 })),              // Top
-      makeMat(getTextureFrom2DSheet('cabeza-abajo', 180) || getPartTexture('cabeza-abajo', { x: 480, y: 0, w: 236, h: 134, rot: -180 })),    // Bottom
+      makeMat(getTextureFrom2DSheet('cabeza-abajo', 0) || getPartTexture('cabeza-abajo', { x: 480, y: 0, w: 236, h: 134, rot: 0 })),        // Bottom
       makeMat(getTextureFrom2DSheet('cabeza-front', 0) || getPartTexture('cabeza-front', { x: 241, y: 136, w: 236, h: 134 })),             // Front
       makeMat(getTextureFrom2DSheet('cabeza-atras', 180) || getPartTexture('cabeza-atras', { x: 720, y: 135, w: 236, h: 134, rot: -180 })),  // Back
     ];
@@ -286,8 +287,8 @@ export const FunkoViewer3D: React.FC<FunkoViewer3DProps> = ({ skinCanvas, render
     const armRightMats = [
       makeMat(getTextureFrom2DSheet('brazo-der-der') || getPartTexture('brazo-der-der', { x: 1440, y: 337, w: 120, h: 204 })), // Right
       makeMat(getTextureFrom2DSheet('brazo-der-izq') || getPartTexture('brazo-der-izq', { x: 1200, y: 337, w: 120, h: 204 })), // Left
-      makeMat(getTextureFrom2DSheet('brazo-der-hombro') || getPartTexture('brazo-der-hombro', { x: 1440, y: 270, w: 120, h: 68 })),  // Top (Hombro)
-      makeMat(getTextureFrom2DSheet('brazo-der-mano-espejo') || getPartTexture('brazo-der-mano-espejo', { x: 1320, y: 270, w: 120, h: 68, flip: true })),  // Bottom (Mano)
+      makeMat(getTextureFrom2DSheet('brazo-der-hombro') || getPartTexture('brazo-der-hombro', { x: 1320, y: 270, w: 120, h: 68 })),  // Top (Hombro)
+      makeMat(getTextureFrom2DSheet('brazo-der-mano') || getPartTexture('brazo-der-mano', { x: 1440, y: 270, w: 120, h: 68, flip: true })),  // Bottom (Mano)
       makeMat(getTextureFrom2DSheet('brazo-der-adelante') || getPartTexture('brazo-der-adelante', { x: 1320, y: 337, w: 120, h: 204 })), // Front
       makeMat(getTextureFrom2DSheet('brazo-der-atras') || getPartTexture('brazo-der-atras', { x: 1560, y: 337, w: 120, h: 204 })), // Back
     ];
@@ -355,16 +356,16 @@ export const FunkoViewer3D: React.FC<FunkoViewer3DProps> = ({ skinCanvas, render
     bodyMesh.castShadow = true;
     funkoGroup.add(bodyMesh);
 
-    // 3. Arms
+    // 3. Arms (Swap de lados: +X es el brazo izquierdo del personaje, -X es el derecho)
     const armGeo = new THREE.BoxGeometry(0.28, 0.75, 0.28);
     const leftArm = new THREE.Mesh(armGeo, armLeftMats);
-    leftArm.position.set(-0.62, -0.56, 0);
-    leftArm.rotation.z = 0.08;
+    leftArm.position.set(0.62, -0.56, 0);
+    leftArm.rotation.z = -0.08;
     funkoGroup.add(leftArm);
 
     const rightArm = new THREE.Mesh(armGeo, armRightMats);
-    rightArm.position.set(0.62, -0.56, 0);
-    rightArm.rotation.z = -0.08;
+    rightArm.position.set(-0.62, -0.56, 0);
+    rightArm.rotation.z = 0.08;
     funkoGroup.add(rightArm);
 
     // 4. Legs
@@ -482,8 +483,13 @@ export const FunkoViewer3D: React.FC<FunkoViewer3DProps> = ({ skinCanvas, render
 
       {/* Top HUD */}
       <div className="absolute top-4 right-4 z-20 flex flex-col items-end gap-1.5 pointer-events-none">
-        <div className="bg-[#1c1f29]/70 backdrop-blur px-2.5 py-0.5 rounded text-[10px] font-mono text-[#bbcabf] border border-[#262a34]">
-          Cabeza: 160% · Torso: 90% · Acabado: Mate
+        <div className="flex items-center gap-1.5">
+          <span className="px-2 py-0.5 rounded text-[10px] font-mono border font-medium bg-[#262a34]/70 backdrop-blur px-2.5 py-0.5 rounded text-[10px] font-mono text-[#bbcabf] border border-[#262a34]">
+            {skinFormat === 'legacy' ? 'Legacy (64×32)' : 'Standard (64×64)'}
+          </span>
+          <div className="bg-[#1c1f29]/70 backdrop-blur px-2.5 py-0.5 rounded text-[10px] font-mono text-[#bbcabf] border border-[#262a34]">
+            Cabeza: 160% · Torso: 90%
+          </div>
         </div>
       </div>
 

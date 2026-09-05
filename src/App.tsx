@@ -9,7 +9,7 @@ import { FunkoViewer3D } from './components/preview-3d/FunkoViewer3D';
 import { renderFunko2D } from './core/engine/funko2dRenderer';
 import { fetchSkinByUsername, loadImage } from './services/skinFetcher';
 import { exportToPDF, exportToPNG } from './services/pdfExporter';
-import { scaleImageNearestNeighbor } from './core/transforms/imageUtils';
+import { scaleImageNearestNeighbor, normalizeSkinCanvas } from './core/transforms/imageUtils';
 
 import { FUNKO_GROOVER_CONFIG } from './core/config/coordinates2d';
 import type { PartTransformation } from './core/engine/types';
@@ -44,19 +44,26 @@ export function App() {
   const [rendered2DCanvas, setRendered2DCanvas] = useState<HTMLCanvasElement | null>(null);
   const [skinCanvas, setSkinCanvas] = useState<HTMLCanvasElement | null>(null);
   const [parts, setParts] = useState<PartTransformation[]>(FUNKO_GROOVER_CONFIG.parts);
+  const [skinFormat, setSkinFormat] = useState<'legacy' | 'standard'>('standard');
 
   // Cache de imágenes cargadas para re-renderizado instantáneo
-  const loadedImagesRef = useRef<{ skin: HTMLImageElement; template: HTMLImageElement } | null>(null);
+  const loadedImagesRef = useRef<{ skin: HTMLImageElement | HTMLCanvasElement; template: HTMLImageElement } | null>(null);
   const preScaledSkinRef = useRef<HTMLCanvasElement | null>(null);
 
   // Procesa la skin inicial o cuando cambia la fuente (solo cuando cambia la URL de la skin)
   const processSkin = useCallback(async (skinSrc: string) => {
     try {
       setIsLoading(true);
-      const [skinImg, templateImg] = await Promise.all([
+      const [rawSkinImg, templateImg] = await Promise.all([
         loadImage(skinSrc),
         loadImage('/templates/molde-groover.png'),
       ]);
+
+      // Detectar automáticamente y normalizar si es una skin legacy de 64x32
+      const isLegacy = rawSkinImg.height * 2 === rawSkinImg.width;
+      setSkinFormat(isLegacy ? 'legacy' : 'standard');
+
+      const skinImg = normalizeSkinCanvas(rawSkinImg, rawSkinImg.width, rawSkinImg.height);
       loadedImagesRef.current = { skin: skinImg, template: templateImg };
 
       // Pre-escalar la skin una sola vez a 1920x1080 (evita re-escalarla en cada frame de drag)
@@ -205,6 +212,7 @@ export function App() {
                       skinCanvas={skinCanvas}
                       rendered2DCanvas={rendered2DCanvas}
                       parts={parts}
+                      skinFormat={skinFormat}
                     />
                   </div>
                 </div>
@@ -224,6 +232,7 @@ export function App() {
                     skinCanvas={skinCanvas}
                     rendered2DCanvas={rendered2DCanvas}
                     parts={parts}
+                    skinFormat={skinFormat}
                   />
                 </div>
               )}
