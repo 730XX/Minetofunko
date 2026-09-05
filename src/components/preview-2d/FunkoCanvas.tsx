@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ZoomIn, ZoomOut, Printer, Grid, RotateCw, RotateCcw, FlipHorizontal, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, RefreshCw } from 'lucide-react';
+import { ZoomIn, ZoomOut, Printer, Grid, RotateCw, RotateCcw, FlipHorizontal, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, RefreshCw, Copy, CopyCheck } from 'lucide-react';
 import type { PartTransformation } from '../../core/engine/types';
 
 interface FunkoCanvasProps {
@@ -18,13 +18,16 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
   onPrint,
 }) => {
   const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
   const [showGrid, setShowGrid] = useState(true);
   const [hoveredPart, setHoveredPart] = useState<PartTransformation | null>(null);
   const [selectedPartId, setSelectedPartId] = useState<string | null>(null);
   const [isMoving, setIsMoving] = useState(false);
-  const [copiedCode, setCopiedCode] = useState(false);
 
-  // Dragging & Resizing state
+  // Pan (Click derecho como Photoshop) & Dragging state
+  const isPanningRef = useRef(false);
+  const panStartPosRef = useRef<{ mouseX: number; mouseY: number; initialPanX: number; initialPanY: number } | null>(null);
   const isDraggingRef = useRef(false);
   const dragStartPosRef = useRef<{ mouseX: number; mouseY: number; initialX: number; initialY: number } | null>(null);
   
@@ -40,17 +43,66 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
   } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const displayCanvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Refs mutables para romper la dependencia circular en closures de eventos
+  const partsRef = useRef(parts);
+  const selectedPartIdRef = useRef(selectedPartId);
+  const onPartsChangeRef = useRef(onPartsChange);
+  const zoomRef = useRef(zoom);
+  useEffect(() => { partsRef.current = parts; }, [parts]);
+  useEffect(() => { selectedPartIdRef.current = selectedPartId; }, [selectedPartId]);
+  useEffect(() => { onPartsChangeRef.current = onPartsChange; }, [onPartsChange]);
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+
+  // Dibujar el canvas generado directamente con drawImage (sin toDataURL)
+  useEffect(() => {
+    if (!canvasElement || !displayCanvasRef.current) return;
+    const destCanvas = displayCanvasRef.current;
+    if (destCanvas.width !== canvasElement.width || destCanvas.height !== canvasElement.height) {
+      destCanvas.width = canvasElement.width;
+      destCanvas.height = canvasElement.height;
+    }
+    const ctx = destCanvas.getContext('2d');
+    if (ctx) {
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, destCanvas.width, destCanvas.height);
+      ctx.drawImage(canvasElement, 0, 0);
+    }
+  }, [canvasElement]);
 
   const selectedPart = parts.find((p) => p.id === selectedPartId) || null;
 
-  const handleZoomIn = () => setZoom((prev) => Math.min(prev + 0.15, 2.0));
-  const handleZoomOut = () => setZoom((prev) => Math.max(prev - 0.15, 0.6));
-  const handleResetZoom = () => setZoom(1);
+  const handleZoomIn = () => setZoom((prev) => Math.min(prev + 0.15, 4.0));
+  const handleZoomOut = () => setZoom((prev) => Math.max(prev - 0.15, 0.4));
+  const handleResetZoom = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
+
+  const [copiedJson, setCopiedJson] = useState(false);
+
+  const handleCopyJson = () => {
+    const jsonStr = JSON.stringify(parts, null, 2);
+    navigator.clipboard.writeText(jsonStr);
+    setCopiedJson(true);
+    setTimeout(() => setCopiedJson(false), 2000);
+  };
 
   const baseW = canvasElement?.width || 606;
   const baseH = canvasElement?.height || 882;
 
-  // Actualizar una propiedad de la pieza seleccionada
+  // Actualizar pieza seleccionada usando refs (evita closures obsoletos)
+  const updatePartViaRef = (updater: (part: PartTransformation) => PartTransformation) => {
+    const currentId = selectedPartIdRef.current;
+    if (!currentId) return;
+    const currentParts = partsRef.current;
+    const updated = currentParts.map((p) => (p.id === currentId ? updater({ ...p }) : p));
+    onPartsChangeRef.current(updated);
+  };
+
+  // Versión para UI (botones, inputs) que usa el state del render actual
   const updateSelectedPart = (updater: (part: PartTransformation) => PartTransformation) => {
     if (!selectedPartId) return;
     const updated = parts.map((p) => (p.id === selectedPartId ? updater({ ...p }) : p));
@@ -60,8 +112,7 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
   // Mover con teclas
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!selectedPartId) return;
-      // Evitar si el foco está en un input
+      if (!selectedPartIdRef.current) return;
       if (document.activeElement?.tagName === 'INPUT') return;
 
       const step = e.shiftKey ? 10 : 1;
@@ -78,7 +129,7 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
       } else return;
 
       e.preventDefault();
-      updateSelectedPart((p) => ({
+      updatePartViaRef((p) => ({
         ...p,
         destination: { x: p.destination.x + dx, y: p.destination.y + dy },
       }));
@@ -86,10 +137,12 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedPartId, parts]);
+  }, []); // Sin deps: usa refs internamente
 
-  // Manejador de inicio de arrastre o selección
+  // Manejador de inicio de arrastre o selección (SOLO CLICK IZQUIERDO)
   const handlePartMouseDown = (e: React.MouseEvent, part: PartTransformation) => {
+    if (e.button !== 0) return;
+
     e.stopPropagation();
     setSelectedPartId(part.id);
     isDraggingRef.current = true;
@@ -101,8 +154,10 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
     };
   };
 
-  // Manejador para iniciar redimensionamiento desde un vértice o punto medio
+  // Manejador para iniciar redimensionamiento desde un vértice o punto medio (SOLO CLICK IZQUIERDO)
   const handleResizeMouseDown = (e: React.MouseEvent, handle: ResizeHandle, part: PartTransformation) => {
+    if (e.button !== 0) return;
+
     e.stopPropagation();
     const isRotated90 = Math.abs((part.rotateDeg || 0) % 180) === 90;
     const visualInitW = isRotated90 ? part.scale.height : part.scale.width;
@@ -124,9 +179,10 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
     const handleMouseMove = (e: MouseEvent) => {
       if (!containerRef.current) return;
 
+      // getBoundingClientRect ya incluye la transformación CSS (zoom), no dividir por zoom otra vez
       const rect = containerRef.current.getBoundingClientRect();
-      const scaleX = baseW / (rect.width * zoom);
-      const scaleY = baseH / (rect.height * zoom);
+      const scaleX = baseW / rect.width;
+      const scaleY = baseH / rect.height;
 
       // 1. Manejo de Redimensionamiento (Esquinas proporcionales y Bordes unidireccionales)
       if (resizeStateRef.current) {
@@ -137,7 +193,6 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
         let newDestX = initialDest.x;
         let newDestY = initialDest.y;
 
-        // Ancho y alto visual en pantalla
         const visualInitW = isRotated90 ? initialScale.height : initialScale.width;
         const visualInitH = isRotated90 ? initialScale.width : initialScale.height;
 
@@ -145,41 +200,33 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
         let visualH = visualInitH;
 
         if (handle === 'se') {
-          // Esquina Sureste: Proporcional parejo
           const scaleFactor = Math.max(0.2, 1 + (deltaX / visualInitW + deltaY / visualInitH) / 2);
           visualW = Math.max(8, Math.round(visualInitW * scaleFactor));
           visualH = Math.max(8, Math.round(visualW / aspectRatio));
         } else if (handle === 'nw') {
-          // Esquina Noroeste: Proporcional parejo
           const scaleFactor = Math.max(0.2, 1 - (deltaX / visualInitW + deltaY / visualInitH) / 2);
           visualW = Math.max(8, Math.round(visualInitW * scaleFactor));
           visualH = Math.max(8, Math.round(visualW / aspectRatio));
           newDestX = Math.round(initialDest.x + (visualInitW - visualW));
           newDestY = Math.round(initialDest.y + (visualInitH - visualH));
         } else if (handle === 'ne') {
-          // Esquina Noreste: Proporcional parejo
           const scaleFactor = Math.max(0.2, 1 + (deltaX / visualInitW - deltaY / visualInitH) / 2);
           visualW = Math.max(8, Math.round(visualInitW * scaleFactor));
           visualH = Math.max(8, Math.round(visualW / aspectRatio));
           newDestY = Math.round(initialDest.y + (visualInitH - visualH));
         } else if (handle === 'sw') {
-          // Esquina Suroeste: Proporcional parejo
           const scaleFactor = Math.max(0.2, 1 - (deltaX / visualInitW - deltaY / visualInitH) / 2);
           visualW = Math.max(8, Math.round(visualInitW * scaleFactor));
           visualH = Math.max(8, Math.round(visualW / aspectRatio));
           newDestX = Math.round(initialDest.x + (visualInitW - visualW));
         } else if (handle === 'e') {
-          // Borde Este: Solo ancho hacia la derecha
           visualW = Math.max(8, Math.round(visualInitW + deltaX));
         } else if (handle === 'w') {
-          // Borde Oeste: Solo ancho hacia la izquierda
           visualW = Math.max(8, Math.round(visualInitW - deltaX));
           newDestX = Math.round(initialDest.x + (visualInitW - visualW));
         } else if (handle === 's') {
-          // Borde Sur: Solo alto hacia abajo
           visualH = Math.max(8, Math.round(visualInitH + deltaY));
         } else if (handle === 'n') {
-          // Borde Norte: Solo alto hacia arriba
           visualH = Math.max(8, Math.round(visualInitH - deltaY));
           newDestY = Math.round(initialDest.y + (visualInitH - visualH));
         }
@@ -187,7 +234,7 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
         const newScaleW = isRotated90 ? visualH : visualW;
         const newScaleH = isRotated90 ? visualW : visualH;
 
-        updateSelectedPart((p) => ({
+        updatePartViaRef((p) => ({
           ...p,
           destination: { x: newDestX, y: newDestY },
           scale: { width: newScaleW, height: newScaleH },
@@ -195,7 +242,21 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
         return;
       }
 
-      // 2. Manejo de Arrastre de Posición
+      // 2. Manejo de Panning (Mover lienzo con Click Derecho estilo Photoshop)
+      if (isPanningRef.current && panStartPosRef.current) {
+        const deltaX = e.clientX - panStartPosRef.current.mouseX;
+        const deltaY = e.clientY - panStartPosRef.current.mouseY;
+
+        setPan({
+          x: panStartPosRef.current.initialPanX + deltaX,
+          y: panStartPosRef.current.initialPanY + deltaY,
+        });
+        return;
+      }
+
+      if (isPanningRef.current) return;
+
+      // 3. Manejo de Arrastre de Posición de Pieza (Solo con click izquierdo)
       if (isDraggingRef.current && dragStartPosRef.current) {
         const deltaX = (e.clientX - dragStartPosRef.current.mouseX) * scaleX;
         const deltaY = (e.clientY - dragStartPosRef.current.mouseY) * scaleY;
@@ -207,14 +268,19 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
         const newX = Math.round(dragStartPosRef.current.initialX + deltaX);
         const newY = Math.round(dragStartPosRef.current.initialY + deltaY);
 
-        updateSelectedPart((p) => ({
+        updatePartViaRef((p) => ({
           ...p,
           destination: { x: newX, y: newY },
         }));
       }
     };
 
-    const handleMouseUp = () => {
+    const handleMouseUp = (e: MouseEvent) => {
+      if (e.button === 2) {
+        isPanningRef.current = false;
+        panStartPosRef.current = null;
+        setIsPanning(false);
+      }
       isDraggingRef.current = false;
       dragStartPosRef.current = null;
       resizeStateRef.current = null;
@@ -227,22 +293,60 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [zoom, baseW, baseH, selectedPartId, parts]);
+  }, [baseW, baseH]); // Solo depende de dimensiones del canvas, NO de parts/zoom/selectedPartId
+
+  // Manejo de Zoom con Ctrl + Rueda de ratón (o rueda directa)
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // Zoom si se mantiene Ctrl o Meta (Mac), o por defecto con la rueda en el canvas
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const zoomDelta = e.deltaY < 0 ? 0.1 : -0.1;
+        setZoom((prev) => Math.min(Math.max(Number((prev + zoomDelta).toFixed(2)), 0.4), 4.0));
+      }
+    };
+
+    viewport.addEventListener('wheel', handleWheel, { passive: false });
+    return () => viewport.removeEventListener('wheel', handleWheel);
+  }, []);
+
+  const handleMouseDownViewport = (e: React.MouseEvent) => {
+    // Click derecho (button === 2): Iniciar Pan del lienzo
+    if (e.button === 2) {
+      e.preventDefault();
+      isPanningRef.current = true;
+      setIsPanning(true);
+      panStartPosRef.current = {
+        mouseX: e.clientX,
+        mouseY: e.clientY,
+        initialPanX: pan.x,
+        initialPanY: pan.y,
+      };
+    }
+  };
 
   return (
     <div
+      ref={viewportRef}
+      onMouseDown={handleMouseDownViewport}
+      onContextMenu={(e) => e.preventDefault()} // Prevenir menú contextual del navegador
       onClick={() => {
         // Solo deseleccionar si se hace click directamente en el fondo oscuro exterior
         setSelectedPartId(null);
       }}
-      className="relative w-full h-full flex items-center justify-center overflow-hidden p-6 select-none bg-[#0a0e17]"
+      className={`relative w-full h-full flex items-center justify-center overflow-hidden p-6 select-none bg-[#0a0e17] ${
+        isPanning ? 'cursor-grabbing' : 'cursor-default'
+      }`}
     >
       {/* Blueprint Grid Background */}
       {showGrid && (
         <div
           className="absolute inset-0 opacity-15 pointer-events-none"
           style={{
-            backgroundImage: 'radial-gradient(circle, #4edea3 1px, transparent 1px)',
+            backgroundImage: 'radial-gradient(circle, #4edea3 1.5px, transparent 1.5px)',
             backgroundSize: '24px 24px',
           }}
         />
@@ -254,8 +358,12 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
           // Deseleccionar al hacer clic en cualquier área vacía del artboard
           setSelectedPartId(null);
         }}
-        style={{ transform: `scale(${zoom})`, transformOrigin: 'center center' }}
-        className="relative bg-[#121620] text-on-surface w-full max-w-[820px] h-[calc(100vh-8.5rem)] max-h-[820px] shadow-2xl rounded-2xl p-6 flex flex-col justify-center select-none transition-transform duration-150 border-0"
+        style={{
+          transform: `translate3d(${pan.x}px, ${pan.y}px, 0px) scale(${zoom})`,
+          transformOrigin: 'center center',
+          transition: isPanning ? 'none' : 'transform 100ms ease-out',
+        }}
+        className="relative bg-[#121620] text-on-surface w-full max-w-[820px] h-[calc(100vh-8.5rem)] max-h-[820px] shadow-2xl rounded-2xl p-6 flex flex-col justify-center select-none border-0 will-change-transform"
       >
         {/* Dynamic Canvas Container with Interactive Hotspots */}
         <div className="relative flex-1 flex items-center justify-center overflow-hidden">
@@ -272,9 +380,8 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
                 justifyContent: 'center',
               }}
             >
-              <img
-                src={canvasElement.toDataURL()}
-                alt="Funko Mold"
+              <canvas
+                ref={displayCanvasRef}
                 className="w-full h-full object-contain [image-rendering:pixelated] block"
               />
 
@@ -634,6 +741,18 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
             className="p-2 rounded-xl text-[#bbcabf] hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
           >
             <RefreshCw className="w-4 h-4" />
+          </button>
+
+          <button
+            onClick={handleCopyJson}
+            title={copiedJson ? "¡JSON copiado!" : "Copiar coordenadas JSON"}
+            className={`p-2 rounded-xl transition-all cursor-pointer ${
+              copiedJson
+                ? 'text-[#4edea3] bg-[#4edea3]/20 border border-[#4edea3]/40'
+                : 'text-[#bbcabf] hover:text-[#4edea3] hover:bg-[#262a34]'
+            }`}
+          >
+            {copiedJson ? <CopyCheck className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
           </button>
 
           <div className="w-5 h-[1px] bg-[#262a34]" />

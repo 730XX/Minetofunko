@@ -10,17 +10,17 @@ export interface RenderFunkoOptions {
   skinImage: HTMLImageElement | ImageBitmap | HTMLCanvasElement;
   templateImage: HTMLImageElement | ImageBitmap | HTMLCanvasElement;
   parts?: PartTransformation[];
+  preScaledSkin?: HTMLCanvasElement;
 }
 
 /**
  * Renderiza el Funko 2D completo replicando exactamente la lógica de ProyectoFunko.java
  */
 export function renderFunko2D(options: RenderFunkoOptions): HTMLCanvasElement {
-  const { skinImage, templateImage, parts = FUNKO_GROOVER_CONFIG.parts } = options;
+  const { skinImage, templateImage, parts = FUNKO_GROOVER_CONFIG.parts, preScaledSkin } = options;
 
-
-  // 1. Escalar la skin a 1920x1080 con Nearest Neighbor tal como en Java
-  const scaledSkin = scaleImageNearestNeighbor(skinImage, 1920, 1080);
+  // 1. Escalar la skin a 1920x1080 con Nearest Neighbor tal como en Java (o reutilizar la ya escalada)
+  const scaledSkin = preScaledSkin || scaleImageNearestNeighbor(skinImage, 1920, 1080);
 
   // 2. Preparar el canvas destino con el tamaño del molde base
   const outputCanvas = document.createElement('canvas');

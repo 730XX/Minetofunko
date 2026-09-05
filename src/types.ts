@@ -1,4 +1,4 @@
-export type ViewMode = '2d' | '3d';
+export type ViewMode = '2d' | '3d' | 'split';
 
 export interface SkinMetadata {
   name: string;

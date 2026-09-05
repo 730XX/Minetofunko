@@ -7,7 +7,7 @@ export const MoldMatrixPanel: React.FC = () => {
       <div className="flex items-center justify-between pb-1">
         <div className="flex items-center gap-2">
           <Ruler className="text-[#4cd7f6] w-4 h-4" />
-          <span className="text-xs font-semibold text-[#dfe2ef]">2. Matriz de Impresión</span>
+          <span className="text-xs font-semibold text-[#dfe2ef]">Matriz de Impresión</span>
         </div>
         <span className="font-mono text-[10px] text-[#bbcabf] bg-[#1c1f29] px-2 py-0.5 rounded border border-[#262a34]">
           Hoja 1 de 1
@@ -35,7 +35,7 @@ export const MoldMatrixPanel: React.FC = () => {
       </div>
 
       {/* Toggles */}
-      <div className="flex flex-col gap-1.5 text-xs">
+      {/* <div className="flex flex-col gap-1.5 text-xs">
         <label className="flex items-center justify-between p-2 bg-[#1c1f29] rounded cursor-pointer hover:bg-[#262a34] border border-[#262a34] transition-colors">
           <span className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-red-400"></span>
@@ -58,7 +58,7 @@ export const MoldMatrixPanel: React.FC = () => {
             className="accent-emerald-500 h-4 w-4 rounded cursor-pointer"
           />
         </label>
-      </div>
+      </div> */}
     </div>
   );
 };

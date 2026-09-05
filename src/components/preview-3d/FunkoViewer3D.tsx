@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { RotateCw, Maximize2, Sparkles } from 'lucide-react';
+import { Eye, Pause } from 'lucide-react';
 
 import type { PartTransformation } from '../../core/engine/types';
 
@@ -15,6 +15,9 @@ export const FunkoViewer3D: React.FC<FunkoViewer3DProps> = ({ skinCanvas, render
   const [autoRotate, setAutoRotate] = useState(true);
   const [wireframe, setWireframe] = useState(false);
   const funkoGroupRef = useRef<THREE.Group | null>(null);
+  const baseMeshRef = useRef<THREE.Mesh | null>(null);
+  const ringMeshRef = useRef<THREE.Mesh | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const materialsRef = useRef<THREE.MeshStandardMaterial[]>([]);
 
   useEffect(() => {
@@ -27,9 +30,11 @@ export const FunkoViewer3D: React.FC<FunkoViewer3DProps> = ({ skinCanvas, render
     const scene = new THREE.Scene();
     scene.background = null;
 
-    // Camera
+    // Camera: Calibrada al centro óptico del Funko con más aire/campo visual
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-    camera.position.set(0, 1.2, 5.5);
+    camera.position.set(0, 0.45, 5.6);
+    camera.lookAt(0, 0.05, 0);
+    cameraRef.current = camera;
 
     // Renderer
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
@@ -68,6 +73,7 @@ export const FunkoViewer3D: React.FC<FunkoViewer3DProps> = ({ skinCanvas, render
     baseMesh.position.y = -1.5;
     baseMesh.receiveShadow = true;
     scene.add(baseMesh);
+    baseMeshRef.current = baseMesh;
 
     // Neon Ring
     const ringGeo = new THREE.TorusGeometry(1.78, 0.02, 16, 64);
@@ -76,6 +82,7 @@ export const FunkoViewer3D: React.FC<FunkoViewer3DProps> = ({ skinCanvas, render
     ringMesh.rotation.x = Math.PI / 2;
     ringMesh.position.y = -1.44;
     scene.add(ringMesh);
+    ringMeshRef.current = ringMesh;
 
     // Funko Group
     const funkoGroup = new THREE.Group();
@@ -396,7 +403,7 @@ export const FunkoViewer3D: React.FC<FunkoViewer3DProps> = ({ skinCanvas, render
       ringMesh.rotation.z += deltaX * 0.01;
 
       camera.position.y = Math.max(-0.5, Math.min(3.5, camera.position.y - deltaY * 0.01));
-      camera.lookAt(0, 0, 0);
+      camera.lookAt(0, 0.05, 0);
 
       prevMouseX = e.clientX;
       prevMouseY = e.clientY;
@@ -409,13 +416,11 @@ export const FunkoViewer3D: React.FC<FunkoViewer3DProps> = ({ skinCanvas, render
 
     // Animation Loop
     let reqId: number;
-    const clock = new THREE.Clock();
     const animate = () => {
       reqId = requestAnimationFrame(animate);
-      const elapsed = clock.getElapsedTime();
 
       if (autoRotate && !isDragging) {
-        funkoGroup.rotation.y += 0.008;
+        funkoGroup.rotation.y += 0.004;
         baseMesh.rotation.y += 0.008;
         ringMesh.rotation.z += 0.008;
       }
@@ -455,6 +460,16 @@ export const FunkoViewer3D: React.FC<FunkoViewer3DProps> = ({ skinCanvas, render
     if (funkoGroupRef.current) {
       funkoGroupRef.current.rotation.set(0, 0, 0);
     }
+    if (baseMeshRef.current) {
+      baseMeshRef.current.rotation.set(0, 0, 0);
+    }
+    if (ringMeshRef.current) {
+      ringMeshRef.current.rotation.set(Math.PI / 2, 0, 0);
+    }
+    if (cameraRef.current) {
+      cameraRef.current.position.set(0, 0.45, 5.6);
+      cameraRef.current.lookAt(0, 0.05, 0);
+    }
   };
 
   return (
@@ -467,10 +482,6 @@ export const FunkoViewer3D: React.FC<FunkoViewer3DProps> = ({ skinCanvas, render
 
       {/* Top HUD */}
       <div className="absolute top-4 right-4 z-20 flex flex-col items-end gap-1.5 pointer-events-none">
-        <div className="bg-[#262a34]/80 backdrop-blur-md px-3 py-1 rounded-full flex items-center gap-1.5 shadow border border-[#3c4a42]">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="font-mono text-xs text-[#dfe2ef]">Proporción Funko Chibi</span>
-        </div>
         <div className="bg-[#1c1f29]/70 backdrop-blur px-2.5 py-0.5 rounded text-[10px] font-mono text-[#bbcabf] border border-[#262a34]">
           Cabeza: 160% · Torso: 90% · Acabado: Mate
         </div>
@@ -479,29 +490,26 @@ export const FunkoViewer3D: React.FC<FunkoViewer3DProps> = ({ skinCanvas, render
       {/* Bottom Floating Controls */}
       <div className="absolute bottom-4 inset-x-0 flex justify-center z-20 pointer-events-none">
         <div className="pointer-events-auto bg-[#262a34]/90 backdrop-blur-md px-4 py-1.5 rounded-full flex items-center gap-2 shadow-2xl border border-[#3c4a42] text-xs">
-          <div className="flex items-center gap-1 text-[#bbcabf] pr-2">
-            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Arrastrá para rotar</span>
-          </div>
-          <span className="text-[#3c4a42]">|</span>
           <button
             onClick={() => setAutoRotate(!autoRotate)}
             className={`flex items-center gap-1 px-2 py-0.5 rounded transition-colors ${
               autoRotate ? 'text-emerald-400' : 'text-[#dfe2ef] hover:text-emerald-400'
             }`}
           >
-            <RotateCw className="w-3.5 h-3.5" />
-            <span>{autoRotate ? 'Pausar' : 'Girar 360°'}</span>
+            <Pause className="w-3.5 h-3.5" />
+            <span>{autoRotate ? 'Pausar' : 'Pausar'}</span>
           </button>
+          <span className="text-[#3c4a42]">|</span>
           <button
             onClick={toggleWireframe}
             className={`flex items-center gap-1 px-2 py-0.5 rounded transition-colors ${
               wireframe ? 'text-[#4cd7f6]' : 'text-[#dfe2ef] hover:text-[#4cd7f6]'
             }`}
           >
-            <Maximize2 className="w-3.5 h-3.5" />
+            <Eye className="w-3.5 h-3.5" />
             <span>Wireframe</span>
           </button>
+           <span className="text-[#3c4a42]">|</span>
           <button
             onClick={resetCamera}
             className="flex items-center gap-1 text-[#dfe2ef] hover:text-emerald-400 px-2 py-0.5 rounded transition-colors"

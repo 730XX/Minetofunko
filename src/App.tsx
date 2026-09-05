@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ViewMode, SkinMetadata } from './types';
 import { Header } from './components/layout/Header';
-import { NavSidebar } from './components/layout/NavSidebar';
 import { SkinSourcePanel } from './components/controls/SkinSourcePanel';
 import { MoldMatrixPanel } from './components/controls/MoldMatrixPanel';
 import { ExportBar } from './components/controls/ExportBar';
@@ -14,10 +13,28 @@ import { scaleImageNearestNeighbor } from './core/transforms/imageUtils';
 
 import { FUNKO_GROOVER_CONFIG } from './core/config/coordinates2d';
 import type { PartTransformation } from './core/engine/types';
-import { RefreshCw, Copy, Check } from 'lucide-react';
 
 export function App() {
-  const [viewMode, setViewMode] = useState<ViewMode>('2d');
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    try {
+      const saved = localStorage.getItem('paperpop_view_mode') as ViewMode | null;
+      if (saved && (saved === '2d' || saved === '3d' || saved === 'split')) {
+        return saved;
+      }
+    } catch {
+      // Ignore localStorage read error
+    }
+    return '2d';
+  });
+
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode);
+    try {
+      localStorage.setItem('paperpop_view_mode', mode);
+    } catch {
+      // Ignore localStorage write error
+    }
+  };
   const [currentSkin, setCurrentSkin] = useState<SkinMetadata>({
     name: 'Default_Scala',
     sourceType: 'default',
@@ -27,12 +44,12 @@ export function App() {
   const [rendered2DCanvas, setRendered2DCanvas] = useState<HTMLCanvasElement | null>(null);
   const [skinCanvas, setSkinCanvas] = useState<HTMLCanvasElement | null>(null);
   const [parts, setParts] = useState<PartTransformation[]>(FUNKO_GROOVER_CONFIG.parts);
-  const [copiedCode, setCopiedCode] = useState(false);
 
   // Cache de imágenes cargadas para re-renderizado instantáneo
   const loadedImagesRef = useRef<{ skin: HTMLImageElement; template: HTMLImageElement } | null>(null);
+  const preScaledSkinRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Procesa la skin inicial o cuando cambia la fuente
+  // Procesa la skin inicial o cuando cambia la fuente (solo cuando cambia la URL de la skin)
   const processSkin = useCallback(async (skinSrc: string) => {
     try {
       setIsLoading(true);
@@ -42,31 +59,34 @@ export function App() {
       ]);
       loadedImagesRef.current = { skin: skinImg, template: templateImg };
 
+      // Pre-escalar la skin una sola vez a 1920x1080 (evita re-escalarla en cada frame de drag)
+      const scaled = scaleImageNearestNeighbor(skinImg, 1920, 1080);
+      preScaledSkinRef.current = scaled;
+      setSkinCanvas(scaled);
+
       // 1. Render 2D Mold
       const result2D = renderFunko2D({
         skinImage: skinImg,
         templateImage: templateImg,
         parts,
+        preScaledSkin: scaled,
       });
       setRendered2DCanvas(result2D);
-
-      // 2. Prepare Skin Canvas for 3D Viewer
-      const scaled = scaleImageNearestNeighbor(skinImg, 1920, 1080);
-      setSkinCanvas(scaled);
     } catch (err) {
       console.error('Error al procesar la skin:', err);
     } finally {
       setIsLoading(false);
     }
-  }, [parts]);
+  }, []);
 
-  // Actualizar molde 2D cuando cambian las piezas sin recargar imágenes ni desmontar componentes
+  // Actualizar molde 2D cuando cambian las piezas sin recargar imágenes ni reiniciar loading
   useEffect(() => {
     if (loadedImagesRef.current) {
       const result2D = renderFunko2D({
         skinImage: loadedImagesRef.current.skin,
         templateImage: loadedImagesRef.current.template,
         parts,
+        preScaledSkin: preScaledSkinRef.current || undefined,
       });
       setRendered2DCanvas(result2D);
     }
@@ -115,22 +135,6 @@ export function App() {
     reader.readAsDataURL(file);
   };
 
-  // Presets
-  const presets = [
-    { name: 'Alex_Adventurer', url: 'https://minotar.net/skin/Alex' },
-    { name: 'Steve_Classic', url: 'https://minotar.net/skin/MHF_Steve' },
-    { name: 'Default_Scala', url: '/templates/default-skin.png' },
-  ];
-
-  const handleSelectPreset = async (preset: { name: string; url: string }) => {
-    setCurrentSkin({
-      name: preset.name,
-      sourceType: 'username',
-      dataUrl: preset.url,
-    });
-    await processSkin(preset.url);
-  };
-
   // Exportaciones
   const handleExportPDF = () => {
     if (rendered2DCanvas) {
@@ -148,17 +152,14 @@ export function App() {
 
     <div className="h-screen w-screen bg-[#0f131c] text-[#dfe2ef] antialiased overflow-hidden flex flex-col">
       {/* Top Header */}
-      <Header viewMode={viewMode} onViewModeChange={setViewMode} />
+      <Header viewMode={viewMode} onViewModeChange={handleViewModeChange} />
 
-      {/* Main Container */}
+      {/* Main Container without redundant left NavSidebar */}
       <div className="flex flex-1 pt-11 w-full h-[calc(100vh-2.75rem)] overflow-hidden">
-        {/* Left Navigation Bar */}
-        <NavSidebar viewMode={viewMode} onViewModeChange={setViewMode} />
-
         {/* Content Area */}
-        <div className="flex-1 flex flex-col xl:flex-row md:pl-56 h-full overflow-hidden">
+        <div className="flex-1 flex flex-col xl:flex-row h-full overflow-hidden w-full">
           {/* Controls & Configuration Sidebar */}
-          <aside className="w-full xl:w-[380px] shrink-0 bg-[#181b25] border-r border-[#262a34] flex flex-col justify-between shadow-2xl z-20 h-full">
+          <aside className="w-full xl:w-[360px] shrink-0 bg-[#181b25] border-r border-[#262a34] flex flex-col justify-between shadow-2xl z-20 h-full">
             <div className="p-4 flex flex-col gap-5 overflow-y-auto flex-1 min-h-0">
               <SkinSourcePanel
                 currentSkin={currentSkin}
@@ -182,75 +183,49 @@ export function App() {
           {/* Main Viewport Stage */}
           <main className="flex-1 flex flex-col bg-[#0f131c] relative overflow-hidden min-w-0 h-full">
             {/* Upper Stage Control Header Bar */}
-            <div className="h-12 px-5 bg-[#1c1f29]/80 backdrop-blur-md border-b border-[#262a34] flex items-center justify-between shrink-0 z-30">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center bg-[#0a0e17] p-1 rounded-full border border-[#262a34]">
-                  <button
-                    onClick={() => setViewMode('2d')}
-                    className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-                      viewMode === '2d'
-                        ? 'bg-[#262a34] text-[#4edea3]'
-                        : 'text-[#bbcabf] hover:text-[#dfe2ef]'
-                    }`}
-                  >
-                    <span>2D Print Mold</span>
-                  </button>
-                  <button
-                    onClick={() => setViewMode('3d')}
-                    className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-                      viewMode === '3d'
-                        ? 'bg-[#262a34] text-[#4edea3]'
-                        : 'text-[#bbcabf] hover:text-[#dfe2ef]'
-                    }`}
-                  >
-                    <span>3D Funko Preview</span>
-                  </button>
-                </div>
-              </div>
+           
 
-              {/* Action Buttons for 2D Mold */}
-              {viewMode === '2d' && (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setParts(FUNKO_GROOVER_CONFIG.parts)}
-                    title="Restablecer todas las piezas al estado de fábrica original"
-                    className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#262a34] hover:bg-rose-500/20 text-[#bbcabf] hover:text-rose-400 font-mono text-[11px] border border-[#3c4a42] hover:border-rose-500/40 transition-all cursor-pointer shadow-sm"
-                  >
-                    <RefreshCw className="w-3 h-3" />
-                    <span>Restablecer Fábrica</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(JSON.stringify(parts, null, 2));
-                      setCopiedCode(true);
-                      setTimeout(() => setCopiedCode(false), 2000);
-                    }}
-                    title="Copiar configuración de coordenadas modificadas"
-                    className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#1c1f29] hover:bg-[#262a34] text-[#4edea3] font-mono text-[11px] border border-[#262a34] hover:border-[#4edea3]/40 transition-colors cursor-pointer shadow-sm"
-                  >
-                    {copiedCode ? <Check className="w-3 h-3 text-[#4edea3]" /> : <Copy className="w-3 h-3" />}
-                    <span>{copiedCode ? '¡Copiado!' : 'Exportar JSON'}</span>
-                  </button>
+            {/* Stage Canvas Area (Single View or Split View) */}
+            <div className="relative flex-1 w-full h-full min-h-0 overflow-hidden">
+              {viewMode === 'split' ? (
+                <div className="w-full h-full flex flex-col lg:flex-row divide-y lg:divide-y-0 lg:divide-x divide-[#262a34]">
+                  {/* Left Half: 2D Mold */}
+                  <div className="flex-1 h-full relative flex items-center justify-center min-w-0 bg-[#0f131c]">
+                    <FunkoCanvas
+                      canvasElement={rendered2DCanvas}
+                      parts={parts}
+                      onPartsChange={setParts}
+                      onResetParts={() => setParts(FUNKO_GROOVER_CONFIG.parts)}
+                      onPrint={handleExportPDF}
+                    />
+                  </div>
+                  {/* Right Half: 3D Funko Studio */}
+                  <div className="flex-1 h-full relative min-w-0 bg-[#0a0e17]">
+                    <FunkoViewer3D
+                      skinCanvas={skinCanvas}
+                      rendered2DCanvas={rendered2DCanvas}
+                      parts={parts}
+                    />
+                  </div>
                 </div>
-              )}
-            </div>
-
-            {/* Stage Canvas Area */}
-            <div className="relative flex-1 w-full h-full min-h-0 overflow-hidden flex items-center justify-center">
-              {viewMode === '2d' ? (
-                <FunkoCanvas
-                  canvasElement={rendered2DCanvas}
-                  parts={parts}
-                  onPartsChange={setParts}
-                  onResetParts={() => setParts(FUNKO_GROOVER_CONFIG.parts)}
-                  onPrint={handleExportPDF}
-                />
+              ) : viewMode === '2d' ? (
+                <div className="w-full h-full flex items-center justify-center">
+                  <FunkoCanvas
+                    canvasElement={rendered2DCanvas}
+                    parts={parts}
+                    onPartsChange={setParts}
+                    onResetParts={() => setParts(FUNKO_GROOVER_CONFIG.parts)}
+                    onPrint={handleExportPDF}
+                  />
+                </div>
               ) : (
-                <FunkoViewer3D
-                  skinCanvas={skinCanvas}
-                  rendered2DCanvas={rendered2DCanvas}
-                  parts={parts}
-                />
+                <div className="w-full h-full">
+                  <FunkoViewer3D
+                    skinCanvas={skinCanvas}
+                    rendered2DCanvas={rendered2DCanvas}
+                    parts={parts}
+                  />
+                </div>
               )}
             </div>
           </main>
