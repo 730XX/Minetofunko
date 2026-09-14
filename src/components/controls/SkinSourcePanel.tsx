@@ -1,5 +1,4 @@
 import React, { useState, useRef } from 'react';
-import { Search, RotateCw, UploadCloud, User, FileImage, History, X } from 'lucide-react';
 import type { SkinMetadata } from '../../types';
 
 interface SkinSourcePanelProps {
@@ -34,7 +33,7 @@ export const SkinSourcePanel: React.FC<SkinSourcePanelProps> = ({
     if (!trimmed) return;
     setRecentSearches((prev) => {
       const filtered = prev.filter((item) => item.toLowerCase() !== trimmed.toLowerCase());
-      const updated = [trimmed, ...filtered].slice(0, 5);
+      const updated = [trimmed, ...filtered].slice(0, 16);
       try {
         localStorage.setItem('craftpop_recent_skins', JSON.stringify(updated));
       } catch {
@@ -45,7 +44,7 @@ export const SkinSourcePanel: React.FC<SkinSourcePanelProps> = ({
   };
 
   const removeRecentSearch = (e: React.MouseEvent, nameToRemove: string) => {
-    e.stopPropagation(); // Evitar disparar la carga de la skin
+    e.stopPropagation();
     setRecentSearches((prev) => {
       const updated = prev.filter((item) => item.toLowerCase() !== nameToRemove.toLowerCase());
       try {
@@ -83,81 +82,85 @@ export const SkinSourcePanel: React.FC<SkinSourcePanelProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-space-md">
       {/* Selector de modo: Nickname vs Subir Archivo */}
-      <div className="grid grid-cols-2 p-1 bg-[#121620] rounded-xl gap-1 border border-[#262a34]">
+      <div className="grid grid-cols-2 p-space-2xs bg-surface-container-low rounded-xl gap-space-2xs border border-surface-container-high/60">
         <button
           onClick={() => setTab('username')}
-          className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex items-center justify-center gap-1.5 py-space-xs px-space-sm rounded-lg font-headline-sm text-body-sm transition-all cursor-pointer ${
             tab === 'username'
-              ? 'bg-[#262a34] text-[#4edea3] shadow-sm'
-              : 'text-[#bbcabf] hover:text-[#dfe2ef]'
+              ? 'bg-surface-container-highest text-primary shadow-xs'
+              : 'text-on-surface-variant hover:text-on-surface'
           }`}
         >
-          <User className="w-3.5 h-3.5" />
+          <span className="material-symbols-outlined text-[16px]">person</span>
           <span>Buscar por User</span>
         </button>
         <button
           onClick={() => setTab('upload')}
-          className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex items-center justify-center gap-1.5 py-space-xs px-space-sm rounded-lg font-headline-sm text-body-sm transition-all cursor-pointer ${
             tab === 'upload'
-              ? 'bg-[#262a34] text-[#4edea3] shadow-sm'
-              : 'text-[#bbcabf] hover:text-[#dfe2ef]'
+              ? 'bg-surface-container-highest text-primary shadow-xs'
+              : 'text-on-surface-variant hover:text-on-surface'
           }`}
         >
-          <FileImage className="w-3.5 h-3.5" />
+          <span className="material-symbols-outlined text-[16px]">image</span>
           <span>Subir PNG</span>
         </button>
       </div>
 
       {/* Vista: Buscar por Nickname */}
       {tab === 'username' ? (
-        <div className="flex flex-col gap-3">
-          <form onSubmit={(e) => handleFetch(e)} className="flex items-center gap-2">
+        <div className="flex flex-col gap-space-sm">
+          <form onSubmit={(e) => handleFetch(e)} className="flex items-center gap-space-xs">
             <div className="relative flex-1 flex items-center">
-              <Search className="absolute left-3 text-[#86948a] w-4 h-4" />
+              <span className="material-symbols-outlined absolute left-3 text-on-surface-variant text-[16px]">
+                search
+              </span>
               <input
                 type="text"
                 value={usernameInput}
                 onChange={(e) => setUsernameInput(e.target.value)}
-                placeholder="Ingresa User de Minecraft..."
-                className="w-full bg-[#0a0e17] text-[#dfe2ef] font-mono text-xs pl-9 pr-3 py-2.5 rounded-xl border border-[#262a34] focus:outline-none focus:border-[#4edea3] transition-colors"
+                placeholder="Nombre / UUID de Minecraft"
+                className="w-full bg-surface-container-lowest text-on-surface font-body-sm text-body-sm pl-9 pr-3 py-2 rounded-xl border border-surface-container-high/60 focus:outline-none focus:border-primary transition-colors"
               />
             </div>
             <button
               type="submit"
               disabled={isLoading || !usernameInput.trim()}
-              className="px-4 py-2.5 bg-[#4edea3] hover:bg-[#3ec48e] text-black text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md transition-all disabled:opacity-40 cursor-pointer"
+              className="px-space-md py-2 bg-primary hover:bg-primary-container text-on-primary font-headline-sm text-headline-sm rounded-xl flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-40 cursor-pointer active:scale-95"
             >
               <span>{isLoading ? '...' : 'Cargar'}</span>
-              <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+              <span className={`material-symbols-outlined text-[16px] ${isLoading ? 'animate-spin' : ''}`}>
+                sync
+              </span>
             </button>
           </form>
 
           {/* Búsquedas recientes con rostros */}
           {recentSearches.length > 0 && (
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center gap-1.5 text-[11px] text-[#86948a] font-mono">
-                <History className="w-3 h-3" />
+            <div className="flex flex-col gap-space-2xs">
+              <div className="flex items-center gap-space-xs text-[11px] text-on-surface-variant font-mono-metric">
+                <span className="material-symbols-outlined text-[13px]">history</span>
                 <span>Recientes:</span>
               </div>
-              <div className="grid grid-cols-2 gap-1.5">
+              <div className="grid grid-cols-2 gap-space-xs">
                 {recentSearches.map((name) => (
                   <div
                     key={name}
                     onClick={() => handleFetch(undefined, name)}
-                    className="flex items-center justify-between p-1.5 rounded-lg bg-[#121620] hover:bg-[#262a34] border border-[#262a34] hover:border-[#4edea3]/40 transition-all text-left cursor-pointer group"
+                    className="flex items-center justify-between p-1.5 rounded-lg bg-surface-container-low hover:bg-surface-container-high border border-surface-container-high/40 hover:border-primary/40 transition-all text-left cursor-pointer group"
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <img
                         src={`https://minotar.net/avatar/${encodeURIComponent(name)}/24`}
                         alt={name}
-                        className="w-6 h-6 rounded [image-rendering:pixelated] shrink-0 border border-[#262a34]"
+                        className="w-5 h-5 rounded [image-rendering:pixelated] shrink-0 border border-surface-container-high"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
                       />
-                      <span className="text-xs font-mono text-[#dfe2ef] group-hover:text-[#4edea3] truncate">
+                      <span className="font-mono-metric text-[11px] text-on-surface group-hover:text-primary truncate">
                         {name}
                       </span>
                     </div>
@@ -165,9 +168,9 @@ export const SkinSourcePanel: React.FC<SkinSourcePanelProps> = ({
                       type="button"
                       onClick={(e) => removeRecentSearch(e, name)}
                       title={`Eliminar ${name} de recientes`}
-                      className="p-1 rounded-md text-[#86948a] hover:text-rose-400 hover:bg-rose-500/10 transition-colors opacity-60 group-hover:opacity-100 shrink-0 cursor-pointer ml-1"
+                      className="p-1 rounded text-on-surface-variant hover:text-error hover:bg-error/10 transition-colors opacity-60 group-hover:opacity-100 shrink-0 cursor-pointer ml-1"
                     >
-                      <X className="w-3 h-3" />
+                      <span className="material-symbols-outlined text-[13px]">close</span>
                     </button>
                   </div>
                 ))}
@@ -181,7 +184,7 @@ export const SkinSourcePanel: React.FC<SkinSourcePanelProps> = ({
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
-          className="group p-6 rounded-xl bg-[#121620] hover:bg-[#1a202d] border-2 border-dashed border-[#262a34] hover:border-[#4edea3] transition-all flex flex-col items-center justify-center text-center cursor-pointer"
+          className="group p-6 rounded-xl bg-surface-container-low hover:bg-surface-container border-2 border-dashed border-surface-container-high/80 hover:border-primary transition-all flex flex-col items-center justify-center text-center cursor-pointer"
         >
           <input
             type="file"
@@ -190,17 +193,17 @@ export const SkinSourcePanel: React.FC<SkinSourcePanelProps> = ({
             accept=".png"
             className="hidden"
           />
-          <div className="w-10 h-10 rounded-full bg-[#4edea3]/10 text-[#4edea3] flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-            <UploadCloud className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+            <span className="material-symbols-outlined text-[22px]">cloud_upload</span>
           </div>
-          <p className="text-xs font-semibold text-[#dfe2ef]">Arrastra o haz clic para subir tu skin</p>
-          <span className="text-[10px] text-[#86948a] mt-1 font-mono">Archivo PNG de Minecraft</span>
+          <p className="font-headline-sm text-body-sm text-on-surface">Arrastra o haz clic para subir tu skin</p>
+          <span className="font-mono-badge text-[10px] text-on-surface-variant mt-1">Archivo PNG de Minecraft</span>
         </div>
       )}
 
       {/* Skin Activa Actual */}
-      <div className="p-3 bg-[#121620] rounded-xl flex items-center gap-3 border border-[#262a34]">
-        <div className="relative w-12 h-12 rounded-lg bg-[#0a0e17] flex items-center justify-center overflow-hidden shrink-0 border border-[#262a34]">
+      <div className="p-space-sm bg-surface-container-low rounded-xl flex items-center gap-space-sm border border-surface-container-high/60">
+        <div className="relative w-12 h-12 rounded-lg bg-surface-container-lowest flex items-center justify-center overflow-hidden shrink-0 border border-surface-container-high/60">
           <img
             src={currentSkin.dataUrl}
             alt={currentSkin.name}
@@ -209,13 +212,13 @@ export const SkinSourcePanel: React.FC<SkinSourcePanelProps> = ({
         </div>
 
         <div className="flex-1 flex flex-col min-w-0">
-          <span className="text-[10px] font-mono text-[#86948a] uppercase tracking-wider">
+          <span className="font-mono-badge text-mono-badge text-on-surface-variant uppercase tracking-wider">
             Skin Actual
           </span>
-          <span className="text-xs font-bold text-[#dfe2ef] truncate">
+          <span className="font-headline-sm text-headline-sm text-on-surface truncate">
             {currentSkin.name.replace('_', ' ')}
           </span>
-          <span className="text-[10px] font-mono text-[#4edea3] mt-0.5">
+          <span className="font-mono-metric text-[10px] text-primary mt-0.5">
             Mapeada al molde 2D y 3D
           </span>
         </div>
@@ -223,4 +226,3 @@ export const SkinSourcePanel: React.FC<SkinSourcePanelProps> = ({
     </div>
   );
 };
-

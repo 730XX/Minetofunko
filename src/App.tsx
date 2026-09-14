@@ -11,10 +11,16 @@ import { fetchSkinByUsername, loadImage } from './services/skinFetcher';
 import { exportToPDF, exportToPNG } from './services/pdfExporter';
 import { scaleImageNearestNeighbor, normalizeSkinCanvas } from './core/transforms/imageUtils';
 
-import { FUNKO_GROOVER_CONFIG } from './core/config/coordinates2d';
+import { FUNKO_GROOVER_CONFIG, createDefaultOverlayParts } from './core/config/coordinates2d';
 import type { PartTransformation } from './core/engine/types';
+import { BoxWizardModal } from './components/box-wizard/BoxWizardModal';
+import { PublishModal } from './components/community/PublishModal';
+import { ExportSuccessPrompt } from './components/community/ExportSuccessPrompt';
+import { CommunityGallery, type CommunityFigure } from './components/community/CommunityGallery';
 
 export function App() {
+  const [activeHubTab, setActiveHubTab] = useState<'editor' | 'community'>('editor');
+  const [communityNavTab, setCommunityNavTab] = useState<'community' | 'my-projects'>('community');
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     try {
       const saved = localStorage.getItem('paperpop_view_mode') as ViewMode | null;
@@ -22,9 +28,9 @@ export function App() {
         return saved;
       }
     } catch {
-      // Ignore localStorage read error
+      // Ignorar fallo de almacenamiento local
     }
-    return '2d';
+    return 'split';
   });
 
   const handleViewModeChange = (mode: ViewMode) => {
@@ -32,19 +38,26 @@ export function App() {
     try {
       localStorage.setItem('paperpop_view_mode', mode);
     } catch {
-      // Ignore localStorage write error
+      // Ignorar fallo de almacenamiento local
     }
   };
   const [currentSkin, setCurrentSkin] = useState<SkinMetadata>({
     name: 'Default_Scala',
     sourceType: 'default',
-    dataUrl: '/templates/default-skin.png',
+    dataUrl: '/templates/molde.png',
   });
   const [isLoading, setIsLoading] = useState(false);
   const [rendered2DCanvas, setRendered2DCanvas] = useState<HTMLCanvasElement | null>(null);
   const [skinCanvas, setSkinCanvas] = useState<HTMLCanvasElement | null>(null);
   const [parts, setParts] = useState<PartTransformation[]>(FUNKO_GROOVER_CONFIG.parts);
+  const [overlayParts, setOverlayParts] = useState<PartTransformation[]>(() => createDefaultOverlayParts(FUNKO_GROOVER_CONFIG.parts));
+  const [activeLayer, setActiveLayer] = useState<'base' | 'overlay'>('base');
   const [skinFormat, setSkinFormat] = useState<'legacy' | 'standard'>('standard');
+  const [selectedPartId, setSelectedPartId] = useState<string | null>(null);
+  const [isBoxWizardOpen, setIsBoxWizardOpen] = useState<boolean>(false);
+  const [isPublishModalOpen, setIsPublishModalOpen] = useState<boolean>(false);
+  const [isExportSuccessOpen, setIsExportSuccessOpen] = useState<boolean>(false);
+  const [showOverlay2D, setShowOverlay2D] = useState<boolean>(true);
 
   // Cache de imágenes cargadas para re-renderizado instantáneo
   const loadedImagesRef = useRef<{ skin: HTMLImageElement | HTMLCanvasElement; template: HTMLImageElement } | null>(null);
@@ -71,12 +84,14 @@ export function App() {
       preScaledSkinRef.current = scaled;
       setSkinCanvas(scaled);
 
-      // 1. Render 2D Mold
+      // Render 2D Mold completo (para el visor 2D y exportación)
       const result2D = renderFunko2D({
         skinImage: skinImg,
         templateImage: templateImg,
         parts,
+        overlayParts,
         preScaledSkin: scaled,
+        showOverlay: showOverlay2D,
       });
       setRendered2DCanvas(result2D);
     } catch (err) {
@@ -84,20 +99,31 @@ export function App() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [showOverlay2D, parts, overlayParts]);
 
-  // Actualizar molde 2D cuando cambian las piezas sin recargar imágenes ni reiniciar loading
+  // Actualizar molde 2D completo cuando cambian piezas base, de relieve o el toggle de visibilidad
+  // Se aplica un debounce de 80ms para que durante el arrastre en 2D el movimiento
+  // y la física 3D fluyan a 60 FPS sin saturar la CPU renderizando 48 piezas de canvas por frame
   useEffect(() => {
-    if (loadedImagesRef.current) {
-      const result2D = renderFunko2D({
-        skinImage: loadedImagesRef.current.skin,
-        templateImage: loadedImagesRef.current.template,
-        parts,
-        preScaledSkin: preScaledSkinRef.current || undefined,
-      });
-      setRendered2DCanvas(result2D);
-    }
-  }, [parts]);
+    if (!loadedImagesRef.current) return;
+
+    const timer = setTimeout(() => {
+      if (loadedImagesRef.current) {
+        const result2D = renderFunko2D({
+          skinImage: loadedImagesRef.current.skin,
+          templateImage: loadedImagesRef.current.template,
+          parts,
+          overlayParts,
+          preScaledSkin: preScaledSkinRef.current || undefined,
+          showOverlay: showOverlay2D,
+        });
+        setRendered2DCanvas(result2D);
+      }
+    }, 80);
+
+    return () => clearTimeout(timer);
+  }, [parts, overlayParts, showOverlay2D]);
+
 
   // Cargar cuando cambia la skin inicial
   useEffect(() => {
@@ -146,28 +172,108 @@ export function App() {
   const handleExportPDF = () => {
     if (rendered2DCanvas) {
       exportToPDF(rendered2DCanvas, `funko-${currentSkin.name}.pdf`);
+      setTimeout(() => setIsExportSuccessOpen(true), 1200);
     }
   };
 
   const handleExportPNG = () => {
     if (rendered2DCanvas) {
       exportToPNG(rendered2DCanvas, `funko-${currentSkin.name}.png`);
+      setTimeout(() => setIsExportSuccessOpen(true), 800);
+    }
+  };
+
+  const handleRemixFigure = async (fig: CommunityFigure) => {
+    setActiveHubTab('editor');
+    if (fig.config) {
+      if (fig.config.parts) setParts(fig.config.parts);
+      if (fig.config.overlayParts) setOverlayParts(fig.config.overlayParts);
+      if (fig.config.skinFormat) setSkinFormat(fig.config.skinFormat);
+    }
+    if (fig.skin_url) {
+      setCurrentSkin({
+        name: fig.title,
+        sourceType: 'default',
+        dataUrl: fig.skin_url,
+      });
+      await processSkin(fig.skin_url);
+    } else {
+      setCurrentSkin((prev) => ({
+        ...prev,
+        name: fig.title,
+      }));
+    }
+  };
+
+  const handleDownloadPdfFigure = async (fig: CommunityFigure) => {
+    if (rendered2DCanvas && currentSkin.name === fig.title) {
+      exportToPDF(rendered2DCanvas, `molde-${fig.title}.pdf`);
+    } else if (fig.skin_url) {
+      try {
+        const [skinImg, templateImg] = await Promise.all([
+          loadImage(fig.skin_url),
+          loadImage('/templates/molde-groover.png'),
+        ]);
+        const normalized = normalizeSkinCanvas(skinImg, skinImg.width, skinImg.height);
+        const scaled = scaleImageNearestNeighbor(normalized, 1920, 1080);
+        const moldCanvas = renderFunko2D({
+          skinImage: normalized,
+          templateImage: templateImg,
+          parts: fig.config?.parts || parts,
+          overlayParts: fig.config?.overlayParts || overlayParts,
+          preScaledSkin: scaled,
+          showOverlay: showOverlay2D,
+        });
+        exportToPDF(moldCanvas, `molde-${fig.title}.pdf`);
+      } catch (err) {
+        console.error('Error al exportar molde de la figura:', err);
+      }
+    } else if (rendered2DCanvas) {
+      exportToPDF(rendered2DCanvas, `molde-${fig.title}.pdf`);
     }
   };
 
   return (
+    <div className="h-screen w-screen bg-background text-on-surface antialiased overflow-hidden flex flex-col font-sans">
+      {/* Top Header unificado para toda la aplicación */}
+      <Header
+        activeHubTab={activeHubTab}
+        onHubTabChange={setActiveHubTab}
+        viewMode={viewMode}
+        onViewModeChange={handleViewModeChange}
+        onOpenBoxWizard={() => setIsBoxWizardOpen(true)}
+        onOpenPublish={() => setIsPublishModalOpen(true)}
+        onOpenMyProjects={() => {
+          setActiveHubTab('community');
+          setCommunityNavTab('my-projects');
+        }}
+      />
 
-    <div className="h-screen w-screen bg-[#0f131c] text-[#dfe2ef] antialiased overflow-hidden flex flex-col">
-      {/* Top Header */}
-      <Header viewMode={viewMode} onViewModeChange={handleViewModeChange} />
+      {/* Contenido según el tab activo: ambos se preservan en el DOM para evitar destruir el contexto WebGL */}
+      <div
+        className={`flex-1 w-full overflow-y-auto overflow-x-hidden ${
+          activeHubTab === 'community' ? 'block view-fade-in' : 'hidden'
+        }`}
+      >
+        <CommunityGallery
+          hideHeader={true}
+          initialNavTab={communityNavTab}
+          onNavigateToEditor={() => setActiveHubTab('editor')}
+          onOpenBoxWizard={() => setIsBoxWizardOpen(true)}
+          onOpenPublish={() => setIsPublishModalOpen(true)}
+          onRemix={handleRemixFigure}
+          onDownloadPdf={handleDownloadPdfFigure}
+        />
+      </div>
 
-      {/* Main Container without redundant left NavSidebar */}
-      <div className="flex flex-1 pt-11 w-full h-[calc(100vh-2.75rem)] overflow-hidden">
-        {/* Content Area */}
-        <div className="flex-1 flex flex-col xl:flex-row h-full overflow-hidden w-full">
+      <div
+        className={`flex-1 w-full h-[calc(100vh-3.5rem)] overflow-hidden ${
+          activeHubTab === 'editor' ? 'flex view-fade-in' : 'hidden'
+        }`}
+      >
           {/* Controls & Configuration Sidebar */}
-          <aside className="w-full xl:w-[360px] shrink-0 bg-[#181b25] border-r border-[#262a34] flex flex-col justify-between shadow-2xl z-20 h-full">
-            <div className="p-4 flex flex-col gap-5 overflow-y-auto flex-1 min-h-0">
+          <aside className="w-full xl:w-[360px] shrink-0 bg-surface-container-low border-r border-surface-container-high/60 flex flex-col justify-between shadow-2xl z-20 h-full">
+            <div className="p-space-md flex flex-col gap-space-lg overflow-y-auto flex-1 min-h-0">
               <SkinSourcePanel
                 currentSkin={currentSkin}
                 isLoading={isLoading}
@@ -188,58 +294,104 @@ export function App() {
           </aside>
 
           {/* Main Viewport Stage */}
-          <main className="flex-1 flex flex-col bg-[#0f131c] relative overflow-hidden min-w-0 h-full">
-            {/* Upper Stage Control Header Bar */}
-           
-
+          <main className="flex-1 flex flex-col bg-background relative overflow-hidden min-w-0 h-full">
             {/* Stage Canvas Area (Single View or Split View) */}
             <div className="relative flex-1 w-full h-full min-h-0 overflow-hidden">
               {viewMode === 'split' ? (
-                <div className="w-full h-full flex flex-col lg:flex-row divide-y lg:divide-y-0 lg:divide-x divide-[#262a34]">
+                <div className="w-full h-full flex flex-col lg:flex-row divide-y lg:divide-y-0 lg:divide-x divide-surface-container-high/60">
                   {/* Left Half: 2D Mold */}
-                  <div className="flex-1 h-full relative flex items-center justify-center min-w-0 bg-[#0f131c]">
+                  <div className="flex-1 h-full relative flex items-center justify-center min-w-0 bg-background">
                     <FunkoCanvas
                       canvasElement={rendered2DCanvas}
                       parts={parts}
                       onPartsChange={setParts}
                       onResetParts={() => setParts(FUNKO_GROOVER_CONFIG.parts)}
+                      overlayParts={overlayParts}
+                      onOverlayPartsChange={setOverlayParts}
+                      onResetOverlayParts={() => setOverlayParts(createDefaultOverlayParts(FUNKO_GROOVER_CONFIG.parts))}
+                      activeLayer={activeLayer}
+                      onActiveLayerChange={setActiveLayer}
                       onPrint={handleExportPDF}
+                      selectedPartId={selectedPartId}
+                      onSelectPart={setSelectedPartId}
+                      showOverlay={showOverlay2D}
+                      onToggleOverlay={() => setShowOverlay2D((prev) => !prev)}
                     />
                   </div>
                   {/* Right Half: 3D Funko Studio */}
-                  <div className="flex-1 h-full relative min-w-0 bg-[#0a0e17]">
+                  <div className="flex-1 h-full relative min-w-0 bg-surface-container-lowest">
                     <FunkoViewer3D
                       skinCanvas={skinCanvas}
                       rendered2DCanvas={rendered2DCanvas}
                       parts={parts}
                       skinFormat={skinFormat}
+                      selectedPartId={selectedPartId}
                     />
                   </div>
                 </div>
               ) : viewMode === '2d' ? (
-                <div className="w-full h-full flex items-center justify-center">
+                <div className="w-full h-full flex items-center justify-center bg-background">
                   <FunkoCanvas
                     canvasElement={rendered2DCanvas}
                     parts={parts}
                     onPartsChange={setParts}
                     onResetParts={() => setParts(FUNKO_GROOVER_CONFIG.parts)}
+                    overlayParts={overlayParts}
+                    onOverlayPartsChange={setOverlayParts}
+                    onResetOverlayParts={() => setOverlayParts(createDefaultOverlayParts(FUNKO_GROOVER_CONFIG.parts))}
+                    activeLayer={activeLayer}
+                    onActiveLayerChange={setActiveLayer}
                     onPrint={handleExportPDF}
+                    selectedPartId={selectedPartId}
+                    onSelectPart={setSelectedPartId}
+                    showOverlay={showOverlay2D}
+                    onToggleOverlay={() => setShowOverlay2D((prev) => !prev)}
                   />
                 </div>
               ) : (
-                <div className="w-full h-full">
+                <div className="w-full h-full bg-surface-container-lowest">
                   <FunkoViewer3D
                     skinCanvas={skinCanvas}
                     rendered2DCanvas={rendered2DCanvas}
                     parts={parts}
                     skinFormat={skinFormat}
+                    selectedPartId={selectedPartId}
                   />
                 </div>
               )}
             </div>
           </main>
         </div>
-      </div>
+
+      {/* Modal Wizard para Personalización de Caja Coleccionable */}
+      <BoxWizardModal
+        isOpen={isBoxWizardOpen}
+        onClose={() => setIsBoxWizardOpen(false)}
+        skinCanvas={skinCanvas}
+        rendered2DCanvas={rendered2DCanvas}
+        parts={parts}
+        characterName={currentSkin.name}
+      />
+
+      {/* Prompt de éxito al exportar con invitación a compartir */}
+      <ExportSuccessPrompt
+        isOpen={isExportSuccessOpen}
+        onClose={() => setIsExportSuccessOpen(false)}
+        onOpenPublish={() => setIsPublishModalOpen(true)}
+        funkoName={currentSkin.name}
+      />
+
+      {/* Modal de Publicación en la Comunidad */}
+      <PublishModal
+        isOpen={isPublishModalOpen}
+        onClose={() => setIsPublishModalOpen(false)}
+        skinCanvas={skinCanvas}
+        rendered2DCanvas={rendered2DCanvas}
+        parts={parts}
+        overlayParts={overlayParts}
+        skinFormat={skinFormat}
+        skinName={currentSkin.name}
+      />
     </div>
   );
 }

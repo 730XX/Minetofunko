@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ZoomIn, ZoomOut, Printer, Grid, RotateCw, RotateCcw, FlipHorizontal, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, RefreshCw, Copy, CopyCheck } from 'lucide-react';
+import { ZoomIn, ZoomOut, Printer, RotateCw, RotateCcw, FlipHorizontal, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, RefreshCw, Copy, CopyCheck, Layers, Box } from 'lucide-react';
 import type { PartTransformation } from '../../core/engine/types';
 
 interface FunkoCanvasProps {
@@ -8,6 +8,15 @@ interface FunkoCanvasProps {
   onPartsChange: (newParts: PartTransformation[]) => void;
   onResetParts: () => void;
   onPrint: () => void;
+  selectedPartId?: string | null;
+  onSelectPart?: (id: string | null) => void;
+  showOverlay?: boolean;
+  onToggleOverlay?: () => void;
+  overlayParts?: PartTransformation[];
+  onOverlayPartsChange?: (newParts: PartTransformation[]) => void;
+  onResetOverlayParts?: () => void;
+  activeLayer?: 'base' | 'overlay';
+  onActiveLayerChange?: (layer: 'base' | 'overlay') => void;
 }
 
 export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
@@ -16,13 +25,41 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
   onPartsChange,
   onResetParts,
   onPrint,
+  selectedPartId: externalSelectedPartId,
+  onSelectPart,
+  showOverlay = true,
+  onToggleOverlay,
+  overlayParts,
+  onOverlayPartsChange,
+  onResetOverlayParts,
+  activeLayer: externalActiveLayer,
+  onActiveLayerChange,
 }) => {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
-  const [showGrid, setShowGrid] = useState(true);
+  const [showGrid] = useState(true);
   const [hoveredPart, setHoveredPart] = useState<PartTransformation | null>(null);
-  const [selectedPartId, setSelectedPartId] = useState<string | null>(null);
+
+  // Capa activa de edición: 'base' o 'overlay'
+  const [internalActiveLayer, setInternalActiveLayer] = useState<'base' | 'overlay'>('base');
+  const activeLayer = externalActiveLayer !== undefined ? externalActiveLayer : internalActiveLayer;
+  const setActiveLayer = (layer: 'base' | 'overlay') => {
+    setInternalActiveLayer(layer);
+    onActiveLayerChange?.(layer);
+    setSelectedPartId(null);
+  };
+
+  const currentParts = activeLayer === 'overlay' ? (overlayParts || []) : parts;
+  const currentOnPartsChange = activeLayer === 'overlay' ? (onOverlayPartsChange || onPartsChange) : onPartsChange;
+  const currentResetParts = activeLayer === 'overlay' ? (onResetOverlayParts || onResetParts) : onResetParts;
+
+  const [internalSelectedPartId, setInternalSelectedPartId] = useState<string | null>(null);
+  const selectedPartId = externalSelectedPartId !== undefined ? externalSelectedPartId : internalSelectedPartId;
+  const setSelectedPartId = (id: string | null) => {
+    setInternalSelectedPartId(id);
+    onSelectPart?.(id);
+  };
   const [isMoving, setIsMoving] = useState(false);
 
   // Pan (Click derecho como Photoshop) & Dragging state
@@ -45,15 +82,16 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const displayCanvasRef = useRef<HTMLCanvasElement>(null);
+  const moveRafRef = useRef<number | null>(null);
 
   // Refs mutables para romper la dependencia circular en closures de eventos
-  const partsRef = useRef(parts);
+  const partsRef = useRef(currentParts);
   const selectedPartIdRef = useRef(selectedPartId);
-  const onPartsChangeRef = useRef(onPartsChange);
+  const onPartsChangeRef = useRef(currentOnPartsChange);
   const zoomRef = useRef(zoom);
-  useEffect(() => { partsRef.current = parts; }, [parts]);
+  useEffect(() => { partsRef.current = currentParts; }, [currentParts]);
   useEffect(() => { selectedPartIdRef.current = selectedPartId; }, [selectedPartId]);
-  useEffect(() => { onPartsChangeRef.current = onPartsChange; }, [onPartsChange]);
+  useEffect(() => { onPartsChangeRef.current = currentOnPartsChange; }, [currentOnPartsChange]);
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
 
   // Dibujar el canvas generado directamente con drawImage (sin toDataURL)
@@ -72,7 +110,7 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
     }
   }, [canvasElement]);
 
-  const selectedPart = parts.find((p) => p.id === selectedPartId) || null;
+  const selectedPart = currentParts.find((p) => p.id === selectedPartId) || null;
 
   const handleZoomIn = () => setZoom((prev) => Math.min(prev + 0.15, 4.0));
   const handleZoomOut = () => setZoom((prev) => Math.max(prev - 0.15, 0.4));
@@ -84,7 +122,7 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
   const [copiedJson, setCopiedJson] = useState(false);
 
   const handleCopyJson = () => {
-    const jsonStr = JSON.stringify(parts, null, 2);
+    const jsonStr = JSON.stringify(currentParts, null, 2);
     navigator.clipboard.writeText(jsonStr);
     setCopiedJson(true);
     setTimeout(() => setCopiedJson(false), 2000);
@@ -93,21 +131,18 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
   const baseW = canvasElement?.width || 606;
   const baseH = canvasElement?.height || 882;
 
-  // Actualizar pieza seleccionada usando refs (evita closures obsoletos)
+  // Actualizar pieza seleccionada usando refs (evita closures obsoletos y soporta clicks rápidos)
   const updatePartViaRef = (updater: (part: PartTransformation) => PartTransformation) => {
-    const currentId = selectedPartIdRef.current;
+    const currentId = selectedPartIdRef.current || selectedPartId;
     if (!currentId) return;
-    const currentParts = partsRef.current;
-    const updated = currentParts.map((p) => (p.id === currentId ? updater({ ...p }) : p));
+    const currentList = partsRef.current;
+    const updated = currentList.map((p) => (p.id === currentId ? updater({ ...p }) : p));
+    partsRef.current = updated;
     onPartsChangeRef.current(updated);
   };
 
-  // Versión para UI (botones, inputs) que usa el state del render actual
-  const updateSelectedPart = (updater: (part: PartTransformation) => PartTransformation) => {
-    if (!selectedPartId) return;
-    const updated = parts.map((p) => (p.id === selectedPartId ? updater({ ...p }) : p));
-    onPartsChange(updated);
-  };
+  // Versión para UI (botones, inputs) que comparte la misma lógica segura
+  const updateSelectedPart = updatePartViaRef;
 
   // Mover con teclas
   useEffect(() => {
@@ -268,14 +303,23 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
         const newX = Math.round(dragStartPosRef.current.initialX + deltaX);
         const newY = Math.round(dragStartPosRef.current.initialY + deltaY);
 
-        updatePartViaRef((p) => ({
-          ...p,
-          destination: { x: newX, y: newY },
-        }));
+        if (!moveRafRef.current) {
+          moveRafRef.current = requestAnimationFrame(() => {
+            moveRafRef.current = null;
+            updatePartViaRef((p) => ({
+              ...p,
+              destination: { x: newX, y: newY },
+            }));
+          });
+        }
       }
     };
 
     const handleMouseUp = (e: MouseEvent) => {
+      if (moveRafRef.current) {
+        cancelAnimationFrame(moveRafRef.current);
+        moveRafRef.current = null;
+      }
       if (e.button === 2) {
         isPanningRef.current = false;
         panStartPosRef.current = null;
@@ -290,6 +334,10 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
     return () => {
+      if (moveRafRef.current) {
+        cancelAnimationFrame(moveRafRef.current);
+        moveRafRef.current = null;
+      }
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
@@ -325,6 +373,9 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
         initialPanX: pan.x,
         initialPanY: pan.y,
       };
+    } else if (e.button === 0 && e.target === e.currentTarget) {
+      // Clic izquierdo SOLO directamente en el fondo deselecciona la pieza activa
+      setSelectedPartId(null);
     }
   };
 
@@ -333,14 +384,41 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
       ref={viewportRef}
       onMouseDown={handleMouseDownViewport}
       onContextMenu={(e) => e.preventDefault()} // Prevenir menú contextual del navegador
-      onClick={() => {
-        // Solo deseleccionar si se hace click directamente en el fondo oscuro exterior
-        setSelectedPartId(null);
-      }}
       className={`relative w-full h-full flex items-center justify-center overflow-hidden p-6 select-none bg-[#0a0e17] ${
         isPanning ? 'cursor-grabbing' : 'cursor-default'
       }`}
     >
+      {/* Top Layer Switcher */}
+      <div className="absolute top-4 inset-x-0 flex justify-center z-30 pointer-events-none">
+        <div
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          className="pointer-events-auto bg-[#181b25]/95 backdrop-blur-md p-1 rounded-2xl flex items-center gap-1 shadow-2xl border border-[#262a34]"
+        >
+          <button
+            onClick={() => setActiveLayer('base')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeLayer === 'base'
+                ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20'
+                : 'text-[#bbcabf] hover:text-[#dfe2ef] hover:bg-[#262a34]'
+            }`}
+          >
+            <span>Capa Base</span>
+          </button>
+          <button
+            onClick={() => setActiveLayer('overlay')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeLayer === 'overlay'
+                ? 'bg-sky-400 text-black shadow-lg shadow-sky-400/20'
+                : 'text-[#bbcabf] hover:text-[#dfe2ef] hover:bg-[#262a34]'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Relieve 3D</span>
+          </button>
+        </div>
+      </div>
+
       {/* Blueprint Grid Background */}
       {showGrid && (
         <div
@@ -387,7 +465,7 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
 
               {/* Interactive Hotspots & Gizmos */}
               <div className="absolute inset-0 pointer-events-none">
-                {parts.map((part) => {
+                {currentParts.map((part) => {
                   const normRot = Math.abs((part.rotateDeg || 0) % 180);
                   const isRotated90 = normRot === 90;
                   const partW = isRotated90 ? part.scale.height : part.scale.width;
@@ -420,11 +498,11 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
                       className={`absolute pointer-events-auto cursor-grab active:cursor-grabbing rounded-[1px] ${
                         isSelected
                           ? isMoving
-                            ? 'bg-[#4cd7f6]/20 z-40'
-                            : 'outline outline-1 outline-[#4cd7f6] z-40'
+                            ? activeLayer === 'overlay' ? 'bg-sky-400/20 z-40' : 'bg-[#4cd7f6]/20 z-40'
+                            : activeLayer === 'overlay' ? 'outline outline-2 outline-sky-400 z-40 shadow-lg shadow-sky-400/20' : 'outline outline-1 outline-[#4cd7f6] z-40'
                           : isHovered
-                          ? 'outline outline-1 outline-[#4cd7f6]/40 z-30'
-                          : 'hover:outline hover:outline-1 hover:outline-[#4cd7f6]/20'
+                          ? activeLayer === 'overlay' ? 'outline outline-1 outline-sky-400/60 z-30' : 'outline outline-1 outline-[#4cd7f6]/40 z-30'
+                          : activeLayer === 'overlay' ? 'hover:outline hover:outline-1 hover:outline-sky-400/30' : 'hover:outline hover:outline-1 hover:outline-[#4cd7f6]/20'
                       }`}
                     >
                       {/* Selection Handles (Balanced Figma standard markers) - Ocultos durante arrastre */}
@@ -482,7 +560,9 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
 
                       {/* Tooltip Pill */}
                       <div
-                        className={`absolute left-1/2 -top-14 -translate-x-1/2 px-2.5 py-1 rounded bg-[#0a0e17]/95 border border-[#3c4a42] text-primary text-[10px] font-mono whitespace-nowrap shadow-2xl z-50 pointer-events-none transition-all ${
+                        className={`absolute left-1/2 -top-14 -translate-x-1/2 px-2.5 py-1 rounded bg-[#0a0e17]/95 border text-[10px] font-mono whitespace-nowrap shadow-2xl z-50 pointer-events-none transition-all ${
+                          activeLayer === 'overlay' ? 'border-sky-400/40 text-sky-300' : 'border-[#3c4a42] text-primary'
+                        } ${
                           isSelected || isHovered
                             ? 'opacity-100 scale-100'
                             : 'opacity-0 scale-95 pointer-events-none'
@@ -490,7 +570,15 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
                       >
                         <div className="font-bold flex items-center gap-1.5">
                           <span>{part.name}</span>
-                          {isSelected && <span className="text-[8px] bg-primary text-black font-semibold px-1 rounded-[2px]">ACTIVO</span>}
+                          {isSelected && (
+                            <span
+                              className={`text-[8px] font-semibold px-1 rounded-[2px] ${
+                                activeLayer === 'overlay' ? 'bg-sky-400 text-black' : 'bg-primary text-black'
+                              }`}
+                            >
+                              {activeLayer === 'overlay' ? 'RELIEVE 3D' : 'BASE'}
+                            </span>
+                          )}
                         </div>
                         <div className="text-[8px] text-[#bbcabf] font-mono">
                           X:{part.destination.x} Y:{part.destination.y} · {part.scale.width}x{part.scale.height} · {part.rotateDeg || 0}°
@@ -514,15 +602,16 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
       {/* Floating Selected Piece Inspector & Quick Actions (Geometry Dash style) */}
       {selectedPart && (
         <div
+          onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
-          className="absolute top-4 left-1/2 -translate-x-1/2 bg-[#181b25]/95 backdrop-blur-md px-4 py-2 rounded-xl shadow-2xl border border-[#3c4a42] flex items-center gap-4 z-50 text-xs font-mono select-none animate-in fade-in slide-in-from-top-2"
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-[#181b25]/95 backdrop-blur-md px-4 py-2 rounded-xl shadow-2xl border border-[#3c4a42] flex items-center gap-4 z-50 text-xs font-mono select-none animate-in fade-in slide-in-from-bottom-2"
         >
-          <div className="flex flex-col border-r border-[#262a34] pr-3">
+          {/* <div className="flex flex-col border-r border-[#262a34] pr-3">
             <span className="text-primary font-bold text-[11px] truncate max-w-[140px]">
               {selectedPart.name}
             </span>
             <span className="text-[9px] text-[#86948a]">Pieza Seleccionada</span>
-          </div>
+          </div> */}
 
           {/* Position Inputs */}
           <div className="flex items-center gap-2">
@@ -687,7 +776,7 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
           {/* Deselect button */}
           <button
             onClick={() => setSelectedPartId(null)}
-            className="px-2 py-1 rounded bg-[#262a34] hover:bg-[#31353f] text-[#bbcabf] text-[10px]"
+            className="px-2 py-1 rounded bg-[#262a34] hover:bg-[#31353f] text-[#bbcabf] text-[10px] cursor-pointer transition-colors"
           >
             Listo
           </button>
@@ -696,7 +785,11 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
 
       {/* Floating Vertical Toolbar (Docked Left) */}
       <div className="absolute left-6 top-1/2 -translate-y-1/2 flex flex-col pointer-events-none z-30">
-        <div className="pointer-events-auto bg-[#181b25]/95 backdrop-blur-md px-2 py-3 rounded-2xl flex flex-col items-center gap-3 shadow-2xl border border-[#262a34]">
+        <div
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          className="pointer-events-auto bg-[#181b25]/95 backdrop-blur-md px-2 py-3 rounded-2xl flex flex-col items-center gap-3 shadow-2xl border border-[#262a34]"
+        >
           <div className="flex flex-col items-center gap-1">
             <button
               onClick={handleZoomIn}
@@ -723,7 +816,7 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
 
           <div className="w-5 h-[1px] bg-[#262a34]" />
 
-          <button
+          {/* <button
             onClick={() => setShowGrid(!showGrid)}
             title={showGrid ? "Ocultar cuadrícula" : "Mostrar cuadrícula"}
             className={`p-2 rounded-xl transition-all cursor-pointer ${
@@ -733,11 +826,25 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
             }`}
           >
             <Grid className="w-4 h-4" />
-          </button>
+          </button> */}
+
+          {onToggleOverlay && (
+            <button
+              onClick={onToggleOverlay}
+              title={showOverlay ? "Ocultar relieve 3D (segunda capa)" : "Mostrar relieve 3D (segunda capa)"}
+              className={`p-2 rounded-xl transition-all cursor-pointer ${
+                showOverlay
+                  ? 'text-[#4edea3] bg-[#4edea3]/10 border border-[#4edea3]/30'
+                  : 'text-[#bbcabf] hover:text-[#dfe2ef] hover:bg-[#262a34]'
+              }`}
+            >
+              <Box className="w-4 h-4" />
+            </button>
+          )}
 
           <button
-            onClick={onResetParts}
-            title="Restablecer piezas a posición original"
+            onClick={currentResetParts}
+            title={activeLayer === 'overlay' ? "Restablecer piezas de relieve 3D a posición original" : "Restablecer piezas base a posición original"}
             className="p-2 rounded-xl text-[#bbcabf] hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
           >
             <RefreshCw className="w-4 h-4" />

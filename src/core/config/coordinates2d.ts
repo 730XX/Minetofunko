@@ -633,3 +633,68 @@ export const FUNKO_GROOVER_CONFIG: Funko2DRenderConfig = {
       }
     ]
 };
+
+/**
+ * Obtiene las coordenadas fuente de la segunda capa (overlay / 3D) en la skin de 1920x1080
+ */
+export function getPartOverlaySource(part: { id: string; source: { x: number; y: number; width: number; height: number } }): { x: number; y: number; width: number; height: number } | null {
+  const { id, source } = part;
+  const w = source.width;
+  const h = source.height;
+
+  // 1. Cabeza (Capa sombrero / pelo)
+  if (id === 'cabeza-front') return { x: 1201, y: 136, width: w, height: h };
+  if (id === 'cabeza-derecha') return { x: 960, y: 136, width: w, height: h };
+  if (id === 'cabeza-izquierda') return { x: 1440, y: 136, width: w, height: h };
+  if (id === 'cabeza-arriba') return { x: 1201, y: 0, width: w, height: h };
+  if (id === 'cabeza-abajo') return { x: 1440, y: 0, width: w, height: h };
+  if (id === 'cabeza-atras') return { x: 1680, y: 135, width: w, height: h };
+
+  // 2. Torso / Pecho (Chaqueta: +270 en Y)
+  if (id.startsWith('pecho-') || id === 'capucha-trasera') {
+    return { x: source.x, y: source.y + 270, width: w, height: h };
+  }
+
+  // 3. Brazo Izquierdo (Manga izquierda: +480 en X)
+  if (id.startsWith('brazo-izq-')) {
+    return { x: source.x + 480, y: source.y, width: w, height: h };
+  }
+
+  // 4. Brazo Derecho (Manga derecha: +270 en Y)
+  if (id.startsWith('brazo-der-')) {
+    return { x: source.x, y: source.y + 270, width: w, height: h };
+  }
+
+  // 5. Pierna Izquierda (Pantalón izquierdo: -480 en X)
+  if (id.startsWith('pierna-izq-')) {
+    return { x: source.x - 480, y: source.y, width: w, height: h };
+  }
+
+  // 6. Pierna Derecha (Pantalón derecho: +270 en Y)
+  if (id.startsWith('pierna-der-')) {
+    return { x: source.x, y: source.y + 270, width: w, height: h };
+  }
+
+  return null;
+}
+
+import type { PartTransformation } from '../engine/types';
+
+/**
+ * Genera la configuración inicial por defecto para las piezas de la segunda capa (Relieve 3D)
+ */
+export function createDefaultOverlayParts(baseParts: PartTransformation[] = FUNKO_GROOVER_CONFIG.parts): PartTransformation[] {
+  return baseParts.map((bp) => {
+    const overlaySource = getPartOverlaySource(bp) || bp.source;
+    return {
+      ...bp,
+      id: `overlay-${bp.id}`,
+      name: `Relieve ${bp.name}`,
+      source: { ...overlaySource },
+      destination: { ...bp.destination },
+      scale: { ...bp.scale },
+      rotateDeg: bp.rotateDeg,
+      mirrorHorizontal: bp.mirrorHorizontal,
+    };
+  });
+}

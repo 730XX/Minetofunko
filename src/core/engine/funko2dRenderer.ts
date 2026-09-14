@@ -10,14 +10,23 @@ export interface RenderFunkoOptions {
   skinImage: HTMLImageElement | ImageBitmap | HTMLCanvasElement;
   templateImage: HTMLImageElement | ImageBitmap | HTMLCanvasElement;
   parts?: PartTransformation[];
+  overlayParts?: PartTransformation[];
   preScaledSkin?: HTMLCanvasElement;
+  showOverlay?: boolean;
 }
 
 /**
- * Renderiza el Funko 2D completo replicando exactamente la lógica de ProyectoFunko.java
+ * Renderiza el Funko 2D completo con soporte para capa base y capa de relieve 3D independientes
  */
 export function renderFunko2D(options: RenderFunkoOptions): HTMLCanvasElement {
-  const { skinImage, templateImage, parts = FUNKO_GROOVER_CONFIG.parts, preScaledSkin } = options;
+  const {
+    skinImage,
+    templateImage,
+    parts = FUNKO_GROOVER_CONFIG.parts,
+    overlayParts,
+    preScaledSkin,
+    showOverlay = true,
+  } = options;
 
   // 1. Escalar la skin a 1920x1080 con Nearest Neighbor tal como en Java (o reutilizar la ya escalada)
   const scaledSkin = preScaledSkin || scaleImageNearestNeighbor(skinImage, 1920, 1080);
@@ -34,10 +43,8 @@ export function renderFunko2D(options: RenderFunkoOptions): HTMLCanvasElement {
   // 3. Dibujar primero el molde base
   ctx.drawImage(templateImage, 0, 0);
 
-  // 4. Procesar cada pieza con sus coordenadas y transformaciones exactas
+  // 4. Procesar piezas base con sus coordenadas y transformaciones exactas
   for (const part of parts) {
-    // Recorte de la skin escalada a 1920x1080 y escalado a la medida de la pieza
-
     let pieceCanvas = scaleImageNearestNeighbor(
       scaledSkin,
       part.scale.width,
@@ -45,18 +52,37 @@ export function renderFunko2D(options: RenderFunkoOptions): HTMLCanvasElement {
       part.source
     );
 
-    // Rotación si aplica
     if (part.rotateDeg) {
       pieceCanvas = rotateCanvas(pieceCanvas, part.rotateDeg);
     }
 
-    // Espejado horizontal si aplica
     if (part.mirrorHorizontal) {
       pieceCanvas = mirrorCanvasHorizontal(pieceCanvas);
     }
 
-    // Dibujar en la posición exacta del molde
     ctx.drawImage(pieceCanvas, part.destination.x, part.destination.y);
+  }
+
+  // 5. Si está habilitada la capa 3D / relieve, procesar las piezas de la segunda capa con sus propias transformaciones
+  if (showOverlay && overlayParts && overlayParts.length > 0) {
+    for (const op of overlayParts) {
+      let overlayCanvas = scaleImageNearestNeighbor(
+        scaledSkin,
+        op.scale.width,
+        op.scale.height,
+        op.source
+      );
+
+      if (op.rotateDeg) {
+        overlayCanvas = rotateCanvas(overlayCanvas, op.rotateDeg);
+      }
+
+      if (op.mirrorHorizontal) {
+        overlayCanvas = mirrorCanvasHorizontal(overlayCanvas);
+      }
+
+      ctx.drawImage(overlayCanvas, op.destination.x, op.destination.y);
+    }
   }
 
   return outputCanvas;
