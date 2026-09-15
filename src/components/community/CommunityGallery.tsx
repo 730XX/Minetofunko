@@ -1,7 +1,38 @@
 import React, { useState, useEffect, useMemo, useTransition } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { fetchCommunityFunkos, incrementFunkoDownload, registerFunkoRemix } from '../../services/communityService';
+import { fetchCommunityFunkos, incrementFunkoDownload, incrementFunkoView, registerFunkoRemix } from '../../services/communityService';
 import type { PartTransformation } from '../../core/engine/types';
+import { Tooltip } from '../common/Tooltip';
+import { RollingNumber } from '../common/RollingNumber';
+import {
+  Boxes,
+  Box,
+  Globe,
+  FolderKanban,
+  Package,
+  UploadCloud,
+  Star,
+  Download,
+  Zap,
+  FileDown,
+  SlidersHorizontal,
+  Grid,
+  PlusCircle,
+  Search,
+  X,
+  TrendingUp,
+  Award,
+  Clock,
+  LayoutGrid,
+  Grid3X3,
+  SearchX,
+  Heart,
+  RefreshCw,
+  Layers,
+  MoreVertical,
+  Database,
+  CheckCircle2,
+} from 'lucide-react';
 
 export interface CommunityFigure {
   id: string;
@@ -40,6 +71,7 @@ interface CommunityGalleryProps {
   onDownloadPdf: (figure: CommunityFigure) => void;
   hideHeader?: boolean;
   initialNavTab?: 'community' | 'my-projects';
+  onNavTabChange?: (tab: 'community' | 'my-projects') => void;
 }
 
 export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
@@ -50,6 +82,7 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
   onDownloadPdf,
   hideHeader = false,
   initialNavTab = 'community',
+  onNavTabChange,
 }) => {
   const { user } = useAuth();
   const [, startTransition] = useTransition();
@@ -60,6 +93,10 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
   const [activeTag, setActiveTag] = useState('all');
   const [viewDensity, setViewDensity] = useState<'large' | 'compact'>('large');
   const [activeNavTab, setActiveNavTab] = useState<'community' | 'my-projects'>(initialNavTab);
+
+  useEffect(() => {
+    setActiveNavTab(initialNavTab);
+  }, [initialNavTab]);
 
   // Supabase items
   const [dbFunkos, setDbFunkos] = useState<CommunityFigure[]>([]);
@@ -121,7 +158,7 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
               image: item.preview_thumbnail_url || item.skin_url,
               alt: item.title,
               tag: item.tags?.[0] ? `#${item.tags[0]}` : '#Comunidad',
-              badge2: 'Molde A4 Listo',
+              // badge2: 'Molde A4 Listo',
               rating: Number(item.rating_avg) || 5.0,
               reviews: Number(item.rating_count) || 1,
               downloads: Number(item.downloads_count) || 0,
@@ -226,15 +263,19 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
   const openDrawer = (figure: CommunityFigure) => {
     setDrawerFigure(figure);
     setIsDrawerOpen(true);
+    if (figure.id) {
+      incrementFunkoView(figure.id);
+    }
   };
 
   const closeDrawer = () => {
     setIsDrawerOpen(false);
   };
 
-  // Ejecutar Remix
+  // Ejecutar Remix con actualización optimista
   const handleRemixClick = (figure: CommunityFigure) => {
     if (figure.id) {
+      incrementFunkoRemixOptimistic(figure.id);
       registerFunkoRemix(figure.id);
     }
     showToast('¡Configuración Clonada!', `Transfiriendo ${figure.title} al Taller 3D...`);
@@ -243,13 +284,28 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
     }, 450);
   };
 
-  // Ejecutar Descarga de Molde
+  // Ejecutar Descarga de Molde con actualización optimista
   const handleDownloadPdfClick = (figure: CommunityFigure) => {
     if (figure.id) {
+      incrementFunkoDownloadOptimistic(figure.id);
       incrementFunkoDownload(figure.id);
     }
     showToast('Generando Molde PDF', `Compilando vectores A4 a 300 DPI de ${figure.title}...`);
     onDownloadPdf(figure);
+  };
+
+  const incrementFunkoDownloadOptimistic = (id: string) => {
+    setDbFunkos((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, downloads: f.downloads + 1 } : f))
+    );
+    setDrawerFigure((prev) => (prev && prev.id === id ? { ...prev, downloads: prev.downloads + 1 } : prev));
+  };
+
+  const incrementFunkoRemixOptimistic = (id: string) => {
+    setDbFunkos((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, remixes: f.remixes + 1 } : f))
+    );
+    setDrawerFigure((prev) => (prev && prev.id === id ? { ...prev, remixes: prev.remixes + 1 } : prev));
   };
 
   return (
@@ -259,7 +315,7 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
         <header className="w-full bg-surface-container-lowest px-space-xl py-space-sm flex flex-wrap items-center justify-between gap-space-md shadow-sm border-b border-surface-container-high/40 sticky top-0 z-40 backdrop-blur-md">
           <div className="flex items-center gap-space-md">
             <div className="flex items-center gap-space-xs cursor-pointer" onClick={onNavigateToEditor}>
-              <span className="material-symbols-outlined text-primary text-[20px]">hub</span>
+              <Boxes className="w-5 h-5 text-primary" />
               <span className="font-headline-sm text-headline-sm text-on-surface">Minetofunko</span>
               <span className="text-on-surface-variant font-mono-metric text-mono-metric">/</span>
               <span className="font-headline-sm text-headline-sm text-primary">Skin Vault Hub</span>
@@ -272,26 +328,28 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
               onClick={onNavigateToEditor}
               className="px-space-md py-space-xs rounded-full font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-space-xs cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[16px]">view_in_ar</span>
+              <Box className="w-3.5 h-3.5 shrink-0" />
               <span>Taller 3D & Molde</span>
             </button>
             <button
-              onClick={() => setActiveNavTab('community')}
+              onClick={() => {
+                setActiveNavTab('community');
+                onNavTabChange?.('community');
+              }}
               className={`px-space-md py-space-xs rounded-full font-headline-sm text-headline-sm flex items-center gap-space-xs transition-all cursor-pointer ${
                 activeNavTab === 'community'
                   ? 'bg-surface-container-highest text-primary shadow-inner'
                   : 'text-on-surface-variant hover:text-on-surface'
               }`}
             >
-              <span className="material-symbols-outlined text-[16px]">public</span>
+              <Globe className="w-3.5 h-3.5 shrink-0" />
               <span>Galería de la Comunidad</span>
-              <span className="px-space-2xs py-0.5 bg-primary/20 text-primary font-mono-badge text-[9px] rounded-full uppercase">
-                Explorar
-              </span>
+             
             </button>
             <button
               onClick={() => {
                 setActiveNavTab('my-projects');
+                onNavTabChange?.('my-projects');
                 showToast('Filtrando Proyectos', 'Mostrando figuras creadas por vos.');
               }}
               className={`px-space-md py-space-xs rounded-full font-body-sm text-body-sm flex items-center gap-space-xs transition-colors cursor-pointer ${
@@ -300,14 +358,14 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
                   : 'text-on-surface-variant hover:text-on-surface'
               }`}
             >
-              <span className="material-symbols-outlined text-[16px]">folder_special</span>
+              <FolderKanban className="w-3.5 h-3.5 shrink-0" />
               <span>Mis Proyectos</span>
             </button>
             <button
               onClick={onOpenBoxWizard}
               className="px-space-md py-space-xs rounded-full font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-space-xs cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[16px]">all_inbox</span>
+              <Package className="w-3.5 h-3.5 shrink-0" />
               <span>Cajas Coleccionista</span>
             </button>
           </nav>
@@ -318,7 +376,7 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
               onClick={onOpenPublish}
               className="px-space-md py-space-xs bg-primary text-on-primary font-headline-sm text-headline-sm rounded hover:bg-primary-container transition-all flex items-center gap-space-xs shadow-md cursor-pointer hover:shadow-primary/20"
             >
-              <span className="material-symbols-outlined text-[18px]">cloud_upload</span>
+              <UploadCloud className="w-4 h-4 shrink-0" />
               <span>Publicar mi Funko</span>
             </button>
             <div className="h-6 w-px bg-surface-container-highest"></div>
@@ -349,7 +407,6 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-space-lg">
             <div className="max-w-2xl flex flex-col gap-space-xs">
               <div className="inline-flex items-center gap-space-xs text-primary font-mono-badge text-mono-badge uppercase tracking-wider">
-                <span className="w-2 h-2 rounded-full bg-primary animate-ping"></span>
                 Directorio Abierto de Papercraft Voxel
               </div>
               <h1 className="font-display-hero text-display-hero text-on-surface tracking-tight">
@@ -363,15 +420,21 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
             {/* Glassmorphic Community Metrics (100% reales de la BD) */}
             <div className="flex flex-wrap items-center gap-space-sm">
               <div className="bg-surface-container-low/80 backdrop-blur-md px-space-lg py-space-sm rounded-xl flex flex-col shadow-sm border border-surface-container-high/40">
-                <span className="font-mono-metric text-headline-md text-primary">{totalDesigns}</span>
+                <span className="font-mono-metric text-headline-md text-primary">
+                  <RollingNumber value={totalDesigns} />
+                </span>
                 <span className="font-body-sm text-body-sm text-on-surface-variant">Diseños Compartidos</span>
               </div>
               <div className="bg-surface-container-low/80 backdrop-blur-md px-space-lg py-space-sm rounded-xl flex flex-col shadow-sm border border-surface-container-high/40">
-                <span className="font-mono-metric text-headline-md text-secondary">{totalDownloads}</span>
+                <span className="font-mono-metric text-headline-md text-secondary">
+                  <RollingNumber value={totalDownloads} />
+                </span>
                 <span className="font-body-sm text-body-sm text-on-surface-variant">Moldes Impresos</span>
               </div>
               <div className="bg-surface-container-low/80 backdrop-blur-md px-space-lg py-space-sm rounded-xl flex flex-col shadow-sm border border-surface-container-high/40">
-                <span className="font-mono-metric text-headline-md text-tertiary">{activeCreators}</span>
+                <span className="font-mono-metric text-headline-md text-tertiary">
+                  <RollingNumber value={activeCreators} />
+                </span>
                 <span className="font-body-sm text-body-sm text-on-surface-variant">Creadores Activos</span>
               </div>
             </div>
@@ -389,7 +452,7 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
                 <div className="flex flex-col gap-space-md max-w-xl">
                   <div className="flex flex-wrap items-center gap-space-xs">
                     <span className="px-space-xs py-space-2xs bg-primary text-on-primary font-mono-badge text-mono-badge rounded uppercase flex items-center gap-1 font-bold">
-                      <span className="material-symbols-outlined text-[14px]">star</span> FIGURA DESTACADA
+                      <Star className="w-3.5 h-3.5 fill-current" /> FIGURA DESTACADA
                     </span>
                     <span className="px-space-xs py-space-2xs bg-surface-container-highest text-secondary font-mono-badge text-mono-badge rounded uppercase">
                       {featuredSpotlight.tag}
@@ -433,7 +496,7 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
                     </div>
 
                     <div className="flex items-center gap-space-xs bg-surface-container-high px-space-sm py-space-2xs rounded">
-                      <span className="material-symbols-outlined text-tertiary text-[18px]">star</span>
+                      <Star className="w-4 h-4 text-tertiary fill-tertiary" />
                       <span className="font-mono-metric text-mono-metric text-on-surface">
                         {featuredSpotlight.rating.toFixed(1)}
                       </span>
@@ -443,8 +506,8 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
                     </div>
 
                     <div className="flex items-center gap-space-xs text-on-surface-variant font-mono-metric text-mono-metric">
-                      <span className="material-symbols-outlined text-[18px]">download</span>
-                      <span>{featuredSpotlight.downloads} descargas</span>
+                      <Download className="w-4 h-4" />
+                      <span><RollingNumber value={featuredSpotlight.downloads} /> descargas</span>
                     </div>
                   </div>
 
@@ -454,21 +517,21 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
                       onClick={() => handleRemixClick(featuredSpotlight)}
                       className="px-space-xl py-space-sm bg-primary text-on-primary font-headline-sm text-headline-sm rounded hover:bg-primary-container transition-all flex items-center gap-space-xs shadow-md cursor-pointer hover:scale-[1.02]"
                     >
-                      <span className="material-symbols-outlined text-[18px]">bolt</span>
+                      <Zap className="w-4 h-4" />
                       <span>Remix en Taller</span>
                     </button>
                     <button
                       onClick={() => handleDownloadPdfClick(featuredSpotlight)}
                       className="px-space-lg py-space-sm bg-surface-container-high text-on-surface font-body-lg text-body-lg rounded hover:bg-surface-container-highest transition-all flex items-center gap-space-xs cursor-pointer"
                     >
-                      <span className="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+                      <FileDown className="w-4 h-4" />
                       <span>Descargar PDF Mold (A4)</span>
                     </button>
                     <button
                       onClick={() => openDrawer(featuredSpotlight)}
                       className="px-space-md py-space-sm bg-surface-container-highest text-on-surface-variant hover:text-on-surface font-body-sm text-body-sm rounded flex items-center gap-space-xs transition-colors cursor-pointer"
                     >
-                      <span className="material-symbols-outlined text-[18px]">tune</span>
+                      <SlidersHorizontal className="w-4 h-4" />
                       <span>Inspeccionar Rig</span>
                     </button>
                   </div>
@@ -491,7 +554,7 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
 
                   <div className="absolute bottom-3 left-3 z-20 flex items-center gap-space-xs bg-surface-container-highest/90 px-space-xs py-1 rounded backdrop-blur">
                     <div className="w-5 h-5 bg-surface-variant rounded overflow-hidden flex items-center justify-center">
-                      <span className="material-symbols-outlined text-[14px] text-primary">grid_4x4</span>
+                      <Grid className="w-3.5 h-3.5 text-primary" />
                     </div>
                     <span className="font-mono-badge text-mono-badge text-on-surface">
                       {featuredSpotlight.specLabel}
@@ -507,7 +570,7 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
             </div>
           ) : !isLoading ? (
             <div className="w-full bg-surface-container-lowest rounded-xl p-space-xl border border-dashed border-surface-container-high flex flex-col items-center justify-center text-center gap-3">
-              <span className="material-symbols-outlined text-5xl text-primary">add_circle_outline</span>
+              <PlusCircle className="w-12 h-12 text-primary" />
               <h2 className="font-headline-lg text-headline-lg text-on-surface">
                 ¡Sé el primero en publicar un Funko en la comunidad!
               </h2>
@@ -530,9 +593,7 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
           <div className="flex flex-col md:flex-row items-center justify-between gap-space-md">
             {/* Search Input */}
             <div className="relative w-full md:w-80">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">
-                search
-              </span>
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
               <input
                 type="text"
                 value={searchTerm}
@@ -543,9 +604,9 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
               {searchTerm && (
                 <button
                   onClick={() => setSearchTerm('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-[14px]">close</span>
+                  <X className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
@@ -563,7 +624,7 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
                     : 'text-on-surface-variant hover:text-on-surface'
                 }`}
               >
-                <span className="material-symbols-outlined text-[16px]">trending_up</span>
+                <TrendingUp className="w-4 h-4 shrink-0" />
                 <span>En Tendencia</span>
               </button>
               <button
@@ -577,7 +638,7 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
                     : 'text-on-surface-variant hover:text-on-surface'
                 }`}
               >
-                <span className="material-symbols-outlined text-[16px]">hotel_class</span>
+                <Award className="w-4 h-4 shrink-0" />
                 <span>Mejor Valorados</span>
               </button>
               <button
@@ -591,7 +652,7 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
                     : 'text-on-surface-variant hover:text-on-surface'
                 }`}
               >
-                <span className="material-symbols-outlined text-[16px]">file_download</span>
+                <Download className="w-4 h-4 shrink-0" />
                 <span>Más Descargados</span>
               </button>
               <button
@@ -605,35 +666,37 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
                     : 'text-on-surface-variant hover:text-on-surface'
                 }`}
               >
-                <span className="material-symbols-outlined text-[16px]">schedule</span>
+                <Clock className="w-4 h-4 shrink-0" />
                 <span>Nuevos</span>
               </button>
             </div>
 
             {/* Density Switcher */}
-            <div className="hidden sm:flex items-center bg-surface-container-lowest p-space-2xs rounded border border-surface-container-high/60">
-              <button
-                onClick={() => setViewDensity('large')}
-                title="Vista Detallada"
-                className={`p-space-2xs rounded transition-colors cursor-pointer ${
-                  viewDensity === 'large'
-                    ? 'bg-surface-container-highest text-primary'
-                    : 'text-on-surface-variant hover:text-on-surface'
-                }`}
-              >
-                <span className="material-symbols-outlined text-[18px]">grid_view</span>
-              </button>
-              <button
-                onClick={() => setViewDensity('compact')}
-                title="Vista Compacta"
-                className={`p-space-2xs rounded transition-colors cursor-pointer ${
-                  viewDensity === 'compact'
-                    ? 'bg-surface-container-highest text-primary'
-                    : 'text-on-surface-variant hover:text-on-surface'
-                }`}
-              >
-                <span className="material-symbols-outlined text-[18px]">calendar_view_month</span>
-              </button>
+            <div className="hidden sm:flex items-center bg-surface-container-lowest p-space-2xs rounded border border-surface-container-high/60 gap-1">
+              <Tooltip position="bottom" content="Vista Detallada">
+                <button
+                  onClick={() => setViewDensity('large')}
+                  className={`p-space-2xs rounded transition-colors cursor-pointer ${
+                    viewDensity === 'large'
+                      ? 'bg-surface-container-highest text-primary'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
+              </Tooltip>
+              <Tooltip position="bottom" content="Vista Compacta">
+                <button
+                  onClick={() => setViewDensity('compact')}
+                  className={`p-space-2xs rounded transition-colors cursor-pointer ${
+                    viewDensity === 'compact'
+                      ? 'bg-surface-container-highest text-primary'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  <Grid3X3 className="w-4 h-4" />
+                </button>
+              </Tooltip>
             </div>
           </div>
 
@@ -668,12 +731,12 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
             <div className="w-full py-20 flex flex-col items-center justify-center gap-3">
               <div className="w-10 h-10 border-3 border-primary/30 border-t-primary rounded-full animate-spin"></div>
               <span className="font-body-sm text-body-sm text-on-surface-variant">
-                Cargando figuras desde Supabase...
+                Cargando funkos...
               </span>
             </div>
           ) : filteredFigures.length === 0 ? (
             <div className="w-full py-16 flex flex-col items-center justify-center text-center gap-3 bg-surface-container-lowest rounded-xl border border-surface-container-high/40">
-              <span className="material-symbols-outlined text-4xl text-on-surface-variant">search_off</span>
+              <SearchX className="w-12 h-12 text-on-surface-variant" />
               <h3 className="font-headline-md text-headline-md text-on-surface">No se encontraron figuras</h3>
               <p className="font-body-sm text-body-sm text-on-surface-variant max-w-md">
                 {activeNavTab === 'my-projects'
@@ -734,34 +797,35 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
                         <span className="px-space-xs py-0.5 bg-surface-container-highest/90 text-primary font-mono-badge text-mono-badge rounded uppercase">
                           {fig.tag}
                         </span>
-                        <span className="px-space-xs py-0.5 bg-primary/20 text-primary font-mono-badge text-mono-badge rounded">
+                        {/* <span className="px-space-xs py-0.5 bg-primary/20 text-primary font-mono-badge text-mono-badge rounded">
                           {fig.badge2 || 'Molde A4 Listo'}
-                        </span>
+                        </span> */}
                       </div>
 
                       {/* Like Button */}
-                      <button
-                        onClick={(e) => toggleLike(e, fig.id)}
-                        className="absolute top-2 right-2 z-20 w-7 h-7 rounded-full bg-surface-container-highest/80 hover:bg-surface-container flex items-center justify-center transition-colors cursor-pointer"
-                        title="Guardar en favoritos"
-                      >
-                        <span
-                          className={`material-symbols-outlined text-[16px] transition-colors ${
-                            isLiked ? 'text-error' : 'text-on-surface-variant hover:text-error'
-                          }`}
-                          style={{ fontVariationSettings: isLiked ? "'FILL' 1" : "'FILL' 0" }}
-                        >
-                          favorite
-                        </span>
-                      </button>
+                      <div className="absolute top-2 right-2 z-20">
+                        <Tooltip position="left" content={isLiked ? "Guardado en favoritos" : "Guardar en favoritos"}>
+                          <button
+                            onClick={(e) => toggleLike(e, fig.id)}
+                            className="w-7 h-7 rounded-full bg-surface-container-highest/80 hover:bg-surface-container flex items-center justify-center transition-colors cursor-pointer"
+                          >
+                            <Heart
+                              className={`w-4 h-4 transition-colors ${
+                                isLiked ? 'text-error fill-error' : 'text-on-surface-variant hover:text-error'
+                              }`}
+                            />
+                          </button>
+                        </Tooltip>
+                      </div>
 
                       {/* Skin Preview mini-badge */}
-                      <div
-                        className="absolute bottom-2 left-2 z-20 flex items-center gap-1 bg-surface-container-highest/90 px-1.5 py-0.5 rounded backdrop-blur"
-                        title="Skin Textura"
-                      >
-                        <div className="w-3.5 h-3.5 bg-secondary-container rounded-xs"></div>
-                        <span className="font-mono-badge text-[9px] text-on-surface">{fig.specLabel}</span>
+                      <div className="absolute bottom-2 left-2 z-20">
+                        <Tooltip position="right" content="Formato de textura de Skin">
+                          <div className="flex items-center gap-1 bg-surface-container-highest/90 px-1.5 py-0.5 rounded backdrop-blur">
+                            <div className="w-3.5 h-3.5 bg-secondary-container rounded-xs"></div>
+                            <span className="font-mono-badge text-[9px] text-on-surface">{fig.specLabel}</span>
+                          </div>
+                        </Tooltip>
                       </div>
                     </div>
 
@@ -786,7 +850,7 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
                             </span>
                           </div>
                           <div className="flex items-center gap-1 text-tertiary">
-                            <span className="material-symbols-outlined text-[14px]">star</span>
+                            <Star className="w-3.5 h-3.5 fill-tertiary text-tertiary" />
                             <span className="font-mono-metric text-mono-metric text-on-surface">
                               {fig.rating.toFixed(1)}
                             </span>
@@ -796,23 +860,26 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
                           </div>
                         </div>
 
-                        <h3
-                          onClick={() => openDrawer(fig)}
-                          className="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors cursor-pointer truncate"
-                          title={fig.title}
-                        >
-                          {fig.title}
-                        </h3>
+                        <Tooltip position="top" content={fig.title}>
+                          <h3
+                            onClick={() => openDrawer(fig)}
+                            className="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors cursor-pointer truncate"
+                          >
+                            {fig.title}
+                          </h3>
+                        </Tooltip>
 
                         <div className="flex items-center gap-space-md text-on-surface-variant font-mono-metric text-[11px] pt-1">
                           <span className="flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[14px]">download</span> {fig.downloads}
+                            <Download className="w-3.5 h-3.5" />
+                            <RollingNumber value={fig.downloads} />
                           </span>
                           <span className="flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[14px]">sync</span> {fig.remixes}
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            <RollingNumber value={fig.remixes} />
                           </span>
                           <span className="flex items-center gap-1 truncate">
-                            <span className="material-symbols-outlined text-[14px]">layers</span>{' '}
+                            <Layers className="w-3.5 h-3.5" />{' '}
                             {fig.specLabel || 'Molde 1:1'}
                           </span>
                         </div>
@@ -824,23 +891,25 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
                           onClick={() => handleRemixClick(fig)}
                           className="flex-1 py-space-xs bg-primary text-on-primary font-headline-sm text-body-sm rounded hover:bg-primary-container transition-all flex items-center justify-center gap-1 shadow-xs cursor-pointer active:scale-95"
                         >
-                          <span className="material-symbols-outlined text-[16px]">bolt</span>
+                          <Zap className="w-4 h-4" />
                           <span>Remix en Taller</span>
                         </button>
-                        <button
-                          onClick={() => handleDownloadPdfClick(fig)}
-                          className="p-space-xs bg-surface-container hover:bg-surface-container-high text-on-surface rounded transition-colors flex items-center justify-center cursor-pointer"
-                          title="Descargar PDF 300 DPI"
-                        >
-                          <span className="material-symbols-outlined text-[18px]">download</span>
-                        </button>
-                        <button
-                          onClick={() => openDrawer(fig)}
-                          className="p-space-xs bg-surface-container hover:bg-surface-container-high text-on-surface-variant rounded transition-colors flex items-center justify-center cursor-pointer"
-                          title="Inspeccionar Rig"
-                        >
-                          <span className="material-symbols-outlined text-[18px]">more_vert</span>
-                        </button>
+                        <Tooltip position="top" content="Descargar Molde PDF (300 DPI)">
+                          <button
+                            onClick={() => handleDownloadPdfClick(fig)}
+                            className="p-space-xs bg-surface-container hover:bg-surface-container-high text-on-surface rounded transition-colors flex items-center justify-center cursor-pointer"
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
+                        </Tooltip>
+                        <Tooltip position="top" content="Inspeccionar Rig 3D y despiece">
+                          <button
+                            onClick={() => openDrawer(fig)}
+                            className="p-space-xs bg-surface-container hover:bg-surface-container-high text-on-surface-variant rounded transition-colors flex items-center justify-center cursor-pointer"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+                        </Tooltip>
                       </div>
                     </div>
                   </div>
@@ -892,14 +961,14 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
         {/* Header Drawer */}
         <div className="p-space-lg bg-surface-container-low flex items-center justify-between border-b border-surface-container-high/40">
           <div className="flex items-center gap-space-xs">
-            <span className="material-symbols-outlined text-primary text-[20px]">database</span>
+            <Database className="w-5 h-5 text-primary" />
             <span className="font-headline-sm text-headline-sm text-on-surface">Inspección de Esquema</span>
           </div>
           <button
             onClick={closeDrawer}
             className="w-8 h-8 rounded bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface flex items-center justify-center transition-colors cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[18px]">close</span>
+            <X className="w-4 h-4" />
           </button>
         </div>
 
@@ -1034,7 +1103,7 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
             }}
             className="w-full py-space-sm bg-primary text-on-primary font-headline-sm text-headline-sm rounded hover:bg-primary-container transition-all flex items-center justify-center gap-space-xs shadow-md cursor-pointer hover:scale-[1.01]"
           >
-            <span className="material-symbols-outlined text-[18px]">bolt</span>
+            <Zap className="w-4 h-4" />
             <span>Clonar Configuración en Editor</span>
           </button>
           <button
@@ -1045,7 +1114,7 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
             }}
             className="w-full py-space-xs bg-surface-container hover:bg-surface-container-high text-on-surface font-body-sm text-body-sm rounded transition-colors flex items-center justify-center gap-space-xs cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
+            <FileDown className="w-4 h-4" />
             <span>Descargar Molde PDF Vectorial</span>
           </button>
         </div>
@@ -1058,7 +1127,7 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
         }`}
       >
         <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary shrink-0">
-          <span className="material-symbols-outlined text-[18px]">check_circle</span>
+          <CheckCircle2 className="w-5 h-5 text-primary" />
         </div>
         <div className="flex flex-col">
           <span className="font-headline-sm text-headline-sm text-on-surface">{toast.title}</span>

@@ -3,6 +3,7 @@ import type { BoxCustomizationConfig, WizardViewMode } from './types';
 import type { PartTransformation } from '../../core/engine/types';
 import { BoxViewer3D } from './BoxViewer3D';
 import { RotateCw, RotateCcw, Focus, Box, Crop } from 'lucide-react';
+import { Tooltip } from '../common/Tooltip';
 
 interface BoxPreviewProps {
   config: BoxCustomizationConfig;
@@ -61,30 +62,33 @@ export const BoxPreview: React.FC<BoxPreviewProps> = ({
       {/* Controles de Rotación */}
       {viewMode === '3d' && (
         <div className="absolute bottom-4 left-4 z-20 flex items-center gap-1 bg-surface-container-high/80 backdrop-blur-md px-2 py-1 rounded-lg border border-outline-variant/30">
-          <button
-            type="button"
-            onClick={() => rotateBox(-15)}
-            className="w-7 h-7 rounded hover:bg-surface-container-highest text-on-surface-variant hover:text-on-surface flex items-center justify-center transition-colors"
-            title="Giro izquierda"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={resetAngle}
-            className="w-7 h-7 rounded hover:bg-surface-container-highest text-on-surface-variant hover:text-on-surface flex items-center justify-center transition-colors"
-            title="Centrar vista"
-          >
-            <Focus className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => rotateBox(15)}
-            className="w-7 h-7 rounded hover:bg-surface-container-highest text-on-surface-variant hover:text-on-surface flex items-center justify-center transition-colors"
-            title="Giro derecha"
-          >
-            <RotateCw className="w-3.5 h-3.5" />
-          </button>
+          <Tooltip position="top" content="Giro izquierda (-15°)">
+            <button
+              type="button"
+              onClick={() => rotateBox(-15)}
+              className="w-7 h-7 rounded hover:bg-surface-container-highest text-on-surface-variant hover:text-on-surface flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+          </Tooltip>
+          <Tooltip position="top" content="Centrar vista frontal">
+            <button
+              type="button"
+              onClick={resetAngle}
+              className="w-7 h-7 rounded hover:bg-surface-container-highest text-on-surface-variant hover:text-on-surface flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <Focus className="w-3.5 h-3.5" />
+            </button>
+          </Tooltip>
+          <Tooltip position="top" content="Giro derecha (+15°)">
+            <button
+              type="button"
+              onClick={() => rotateBox(15)}
+              className="w-7 h-7 rounded hover:bg-surface-container-highest text-on-surface-variant hover:text-on-surface flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <RotateCw className="w-3.5 h-3.5" />
+            </button>
+          </Tooltip>
           <span className="font-mono text-[11px] text-on-surface-variant pl-1">
             ROT: <span className="text-secondary font-semibold">{rotationAngle}°</span>
           </span>

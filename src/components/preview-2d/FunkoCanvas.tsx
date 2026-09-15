@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ZoomIn, ZoomOut, Printer, RotateCw, RotateCcw, FlipHorizontal, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, RefreshCw, Copy, CopyCheck, Layers, Box } from 'lucide-react';
 import type { PartTransformation } from '../../core/engine/types';
+import { Tooltip } from '../common/Tooltip';
 
 interface FunkoCanvasProps {
   canvasElement: HTMLCanvasElement | null;
@@ -512,22 +513,18 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
                           <div
                             onMouseDown={(e) => handleResizeMouseDown(e, 'nw', part)}
                             className="absolute -top-1 -left-1 w-2 h-2 bg-white border border-[#181b25] rounded-[1px] cursor-nwse-resize shadow-xs z-50 pointer-events-auto"
-                            title="Escalar Proporcional (Noroeste)"
                           />
                           <div
                             onMouseDown={(e) => handleResizeMouseDown(e, 'ne', part)}
                             className="absolute -top-1 -right-1 w-2 h-2 bg-white border border-[#181b25] rounded-[1px] cursor-nesw-resize shadow-xs z-50 pointer-events-auto"
-                            title="Escalar Proporcional (Noreste)"
                           />
                           <div
                             onMouseDown={(e) => handleResizeMouseDown(e, 'sw', part)}
                             className="absolute -bottom-1 -left-1 w-2 h-2 bg-white border border-[#181b25] rounded-[1px] cursor-nesw-resize shadow-xs z-50 pointer-events-auto"
-                            title="Escalar Proporcional (Suroeste)"
                           />
                           <div
                             onMouseDown={(e) => handleResizeMouseDown(e, 'se', part)}
                             className="absolute -bottom-1 -right-1 w-2 h-2 bg-white border border-[#181b25] rounded-[1px] cursor-nwse-resize shadow-xs z-50 pointer-events-auto"
-                            title="Escalar Proporcional (Sureste)"
                           />
 
                           {/* 4 Puntos Medios: Escala Unidireccional (Equilibrados) */}
@@ -535,25 +532,21 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
                           <div
                             onMouseDown={(e) => handleResizeMouseDown(e, 'n', part)}
                             className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-1.5 bg-white border border-[#181b25] rounded-[1px] cursor-ns-resize shadow-xs z-50 pointer-events-auto"
-                            title="Escalar Alto (Arriba)"
                           />
                           {/* Bottom / South */}
                           <div
                             onMouseDown={(e) => handleResizeMouseDown(e, 's', part)}
                             className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-3 h-1.5 bg-white border border-[#181b25] rounded-[1px] cursor-ns-resize shadow-xs z-50 pointer-events-auto"
-                            title="Escalar Alto (Abajo)"
                           />
                           {/* Left / West */}
                           <div
                             onMouseDown={(e) => handleResizeMouseDown(e, 'w', part)}
                             className="absolute -left-1 top-1/2 -translate-y-1/2 w-1.5 h-3 bg-white border border-[#181b25] rounded-[1px] cursor-ew-resize shadow-xs z-50 pointer-events-auto"
-                            title="Escalar Ancho (Izquierda)"
                           />
                           {/* Right / East */}
                           <div
                             onMouseDown={(e) => handleResizeMouseDown(e, 'e', part)}
                             className="absolute -right-1 top-1/2 -translate-y-1/2 w-1.5 h-3 bg-white border border-[#181b25] rounded-[1px] cursor-ew-resize shadow-xs z-50 pointer-events-auto"
-                            title="Escalar Ancho (Derecha)"
                           />
                         </>
                       )}
@@ -647,54 +640,58 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
 
           {/* Quick D-Pad movement */}
           <div className="flex items-center gap-0.5 border-l border-[#262a34] pl-2">
-            <button
-              onClick={() =>
-                updateSelectedPart((p) => ({
-                  ...p,
-                  destination: { ...p.destination, x: p.destination.x - 1 },
-                }))
-              }
-              className="p-1 rounded bg-[#0a0e17] hover:bg-surface-container text-[#dfe2ef] hover:text-primary"
-              title="Izquierda (-1px)"
-            >
-              <ArrowLeft className="w-3 h-3" />
-            </button>
-            <button
-              onClick={() =>
-                updateSelectedPart((p) => ({
-                  ...p,
-                  destination: { ...p.destination, y: p.destination.y - 1 },
-                }))
-              }
-              className="p-1 rounded bg-[#0a0e17] hover:bg-surface-container text-[#dfe2ef] hover:text-primary"
-              title="Arriba (-1px)"
-            >
-              <ArrowUp className="w-3 h-3" />
-            </button>
-            <button
-              onClick={() =>
-                updateSelectedPart((p) => ({
-                  ...p,
-                  destination: { ...p.destination, y: p.destination.y + 1 },
-                }))
-              }
-              className="p-1 rounded bg-[#0a0e17] hover:bg-surface-container text-[#dfe2ef] hover:text-primary"
-              title="Abajo (+1px)"
-            >
-              <ArrowDown className="w-3 h-3" />
-            </button>
-            <button
-              onClick={() =>
-                updateSelectedPart((p) => ({
-                  ...p,
-                  destination: { ...p.destination, x: p.destination.x + 1 },
-                }))
-              }
-              className="p-1 rounded bg-[#0a0e17] hover:bg-surface-container text-[#dfe2ef] hover:text-primary"
-              title="Derecha (+1px)"
-            >
-              <ArrowRight className="w-3 h-3" />
-            </button>
+            <Tooltip position="top" content="Izquierda (-1px)">
+              <button
+                onClick={() =>
+                  updateSelectedPart((p) => ({
+                    ...p,
+                    destination: { ...p.destination, x: p.destination.x - 1 },
+                  }))
+                }
+                className="p-1 rounded bg-[#0a0e17] hover:bg-surface-container text-[#dfe2ef] hover:text-primary cursor-pointer"
+              >
+                <ArrowLeft className="w-3 h-3" />
+              </button>
+            </Tooltip>
+            <Tooltip position="top" content="Arriba (-1px)">
+              <button
+                onClick={() =>
+                  updateSelectedPart((p) => ({
+                    ...p,
+                    destination: { ...p.destination, y: p.destination.y - 1 },
+                  }))
+                }
+                className="p-1 rounded bg-[#0a0e17] hover:bg-surface-container text-[#dfe2ef] hover:text-primary cursor-pointer"
+              >
+                <ArrowUp className="w-3 h-3" />
+              </button>
+            </Tooltip>
+            <Tooltip position="top" content="Abajo (+1px)">
+              <button
+                onClick={() =>
+                  updateSelectedPart((p) => ({
+                    ...p,
+                    destination: { ...p.destination, y: p.destination.y + 1 },
+                  }))
+                }
+                className="p-1 rounded bg-[#0a0e17] hover:bg-surface-container text-[#dfe2ef] hover:text-primary cursor-pointer"
+              >
+                <ArrowDown className="w-3 h-3" />
+              </button>
+            </Tooltip>
+            <Tooltip position="top" content="Derecha (+1px)">
+              <button
+                onClick={() =>
+                  updateSelectedPart((p) => ({
+                    ...p,
+                    destination: { ...p.destination, x: p.destination.x + 1 },
+                  }))
+                }
+                className="p-1 rounded bg-[#0a0e17] hover:bg-surface-container text-[#dfe2ef] hover:text-primary cursor-pointer"
+              >
+                <ArrowRight className="w-3 h-3" />
+              </button>
+            </Tooltip>
           </div>
 
           {/* Scale Inputs */}
@@ -731,46 +728,49 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
 
           {/* Transformation Buttons: Rotate & Mirror */}
           <div className="flex items-center gap-1 border-l border-[#262a34] pl-2">
-            <button
-              onClick={() =>
-                updateSelectedPart((p) => ({
-                  ...p,
-                  rotateDeg: ((((p.rotateDeg || 0) - 90) % 360) + 360) % 360,
-                }))
-              }
-              className="p-1.5 rounded bg-[#0a0e17] hover:bg-[#262a34] text-[#dfe2ef] hover:text-primary transition-colors"
-              title="Rotar -90°"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() =>
-                updateSelectedPart((p) => ({
-                  ...p,
-                  rotateDeg: ((((p.rotateDeg || 0) + 90) % 360) + 360) % 360,
-                }))
-              }
-              className="p-1.5 rounded bg-[#0a0e17] hover:bg-[#262a34] text-[#dfe2ef] hover:text-primary transition-colors"
-              title="Rotar +90°"
-            >
-              <RotateCw className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() =>
-                updateSelectedPart((p) => ({
-                  ...p,
-                  mirrorHorizontal: !p.mirrorHorizontal,
-                }))
-              }
-              className={`p-1.5 rounded border transition-colors ${
-                selectedPart.mirrorHorizontal
-                  ? 'bg-secondary/20 text-secondary border-secondary/40'
-                  : 'bg-[#0a0e17] hover:bg-[#262a34] text-[#dfe2ef] border-transparent'
-              }`}
-              title="Invertir horizontal (Mirror)"
-            >
-              <FlipHorizontal className="w-3.5 h-3.5" />
-            </button>
+            <Tooltip position="top" content="Rotar -90°">
+              <button
+                onClick={() =>
+                  updateSelectedPart((p) => ({
+                    ...p,
+                    rotateDeg: ((((p.rotateDeg || 0) - 90) % 360) + 360) % 360,
+                  }))
+                }
+                className="p-1.5 rounded bg-[#0a0e17] hover:bg-[#262a34] text-[#dfe2ef] hover:text-primary transition-colors cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+            </Tooltip>
+            <Tooltip position="top" content="Rotar +90°">
+              <button
+                onClick={() =>
+                  updateSelectedPart((p) => ({
+                    ...p,
+                    rotateDeg: ((((p.rotateDeg || 0) + 90) % 360) + 360) % 360,
+                  }))
+                }
+                className="p-1.5 rounded bg-[#0a0e17] hover:bg-[#262a34] text-[#dfe2ef] hover:text-primary transition-colors cursor-pointer"
+              >
+                <RotateCw className="w-3.5 h-3.5" />
+              </button>
+            </Tooltip>
+            <Tooltip position="top" content="Invertir horizontal (Espejo)">
+              <button
+                onClick={() =>
+                  updateSelectedPart((p) => ({
+                    ...p,
+                    mirrorHorizontal: !p.mirrorHorizontal,
+                  }))
+                }
+                className={`p-1.5 rounded border transition-colors cursor-pointer ${
+                  selectedPart.mirrorHorizontal
+                    ? 'bg-secondary/20 text-secondary border-secondary/40'
+                    : 'bg-[#0a0e17] hover:bg-[#262a34] text-[#dfe2ef] border-transparent'
+                }`}
+              >
+                <FlipHorizontal className="w-3.5 h-3.5" />
+              </button>
+            </Tooltip>
           </div>
 
           {/* Deselect button */}
@@ -791,86 +791,90 @@ export const FunkoCanvas: React.FC<FunkoCanvasProps> = ({
           className="pointer-events-auto bg-[#181b25]/95 backdrop-blur-md px-2 py-3 rounded-2xl flex flex-col items-center gap-3 shadow-2xl border border-[#262a34]"
         >
           <div className="flex flex-col items-center gap-1">
-            <button
-              onClick={handleZoomIn}
-              title="Acercar"
-              className="p-2 rounded-xl text-[#bbcabf] hover:text-[#4edea3] hover:bg-[#262a34] transition-all cursor-pointer"
-            >
-              <ZoomIn className="w-4 h-4" />
-            </button>
-            <button
-              onClick={handleResetZoom}
-              title="Restablecer Zoom (100%)"
-              className="font-mono text-[10px] font-semibold text-[#dfe2ef] hover:text-[#4edea3] px-1 py-0.5 rounded hover:bg-[#262a34] transition-colors cursor-pointer"
-            >
-              {Math.round(zoom * 100)}%
-            </button>
-            <button
-              onClick={handleZoomOut}
-              title="Alejar"
-              className="p-2 rounded-xl text-[#bbcabf] hover:text-[#4edea3] hover:bg-[#262a34] transition-all cursor-pointer"
-            >
-              <ZoomOut className="w-4 h-4" />
-            </button>
+            <Tooltip position="right" content="Acercar (+)">
+              <button
+                onClick={handleZoomIn}
+                className="p-2 rounded-xl text-[#bbcabf] hover:text-[#4edea3] hover:bg-[#262a34] transition-all cursor-pointer"
+              >
+                <ZoomIn className="w-4 h-4" />
+              </button>
+            </Tooltip>
+            <Tooltip position="right" content="Restablecer Zoom (100%)">
+              <button
+                onClick={handleResetZoom}
+                className="font-mono text-[10px] font-semibold text-[#dfe2ef] hover:text-[#4edea3] px-1 py-0.5 rounded hover:bg-[#262a34] transition-colors cursor-pointer"
+              >
+                {Math.round(zoom * 100)}%
+              </button>
+            </Tooltip>
+            <Tooltip position="right" content="Alejar (-)">
+              <button
+                onClick={handleZoomOut}
+                className="p-2 rounded-xl text-[#bbcabf] hover:text-[#4edea3] hover:bg-[#262a34] transition-all cursor-pointer"
+              >
+                <ZoomOut className="w-4 h-4" />
+              </button>
+            </Tooltip>
           </div>
 
           <div className="w-5 h-[1px] bg-[#262a34]" />
 
-          {/* <button
-            onClick={() => setShowGrid(!showGrid)}
-            title={showGrid ? "Ocultar cuadrícula" : "Mostrar cuadrícula"}
-            className={`p-2 rounded-xl transition-all cursor-pointer ${
-              showGrid
-                ? 'text-[#4edea3] bg-[#4edea3]/10 border border-[#4edea3]/30'
-                : 'text-[#bbcabf] hover:text-[#dfe2ef] hover:bg-[#262a34]'
-            }`}
-          >
-            <Grid className="w-4 h-4" />
-          </button> */}
-
           {onToggleOverlay && (
-            <button
-              onClick={onToggleOverlay}
-              title={showOverlay ? "Ocultar relieve 3D (segunda capa)" : "Mostrar relieve 3D (segunda capa)"}
-              className={`p-2 rounded-xl transition-all cursor-pointer ${
-                showOverlay
-                  ? 'text-[#4edea3] bg-[#4edea3]/10 border border-[#4edea3]/30'
-                  : 'text-[#bbcabf] hover:text-[#dfe2ef] hover:bg-[#262a34]'
-              }`}
+            <Tooltip
+              position="right"
+              content={showOverlay ? "Ocultar relieve 3D (segunda capa)" : "Mostrar relieve 3D (segunda capa)"}
             >
-              <Box className="w-4 h-4" />
-            </button>
+              <button
+                onClick={onToggleOverlay}
+                className={`p-2 rounded-xl transition-all cursor-pointer ${
+                  showOverlay
+                    ? 'text-[#4edea3] bg-[#4edea3]/10 border border-[#4edea3]/30'
+                    : 'text-[#bbcabf] hover:text-[#dfe2ef] hover:bg-[#262a34]'
+                }`}
+              >
+                <Box className="w-4 h-4" />
+              </button>
+            </Tooltip>
           )}
 
-          <button
-            onClick={currentResetParts}
-            title={activeLayer === 'overlay' ? "Restablecer piezas de relieve 3D a posición original" : "Restablecer piezas base a posición original"}
-            className="p-2 rounded-xl text-[#bbcabf] hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
+          <Tooltip
+            position="right"
+            content={activeLayer === 'overlay' ? "Restablecer relieve 3D a posición original" : "Restablecer piezas base a posición original"}
           >
-            <RefreshCw className="w-4 h-4" />
-          </button>
+            <button
+              onClick={currentResetParts}
+              className="p-2 rounded-xl text-[#bbcabf] hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </Tooltip>
 
-          <button
-            onClick={handleCopyJson}
-            title={copiedJson ? "¡JSON copiado!" : "Copiar coordenadas JSON"}
-            className={`p-2 rounded-xl transition-all cursor-pointer ${
-              copiedJson
-                ? 'text-[#4edea3] bg-[#4edea3]/20 border border-[#4edea3]/40'
-                : 'text-[#bbcabf] hover:text-[#4edea3] hover:bg-[#262a34]'
-            }`}
+          <Tooltip
+            position="right"
+            content={copiedJson ? "¡JSON copiado al portapapeles!" : "Copiar coordenadas JSON"}
           >
-            {copiedJson ? <CopyCheck className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-          </button>
+            <button
+              onClick={handleCopyJson}
+              className={`p-2 rounded-xl transition-all cursor-pointer ${
+                copiedJson
+                  ? 'text-[#4edea3] bg-[#4edea3]/20 border border-[#4edea3]/40'
+                  : 'text-[#bbcabf] hover:text-[#4edea3] hover:bg-[#262a34]'
+              }`}
+            >
+              {copiedJson ? <CopyCheck className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            </button>
+          </Tooltip>
 
           <div className="w-5 h-[1px] bg-[#262a34]" />
 
-          <button
-            onClick={onPrint}
-            title="Exportar PDF"
-            className="p-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold transition-all shadow-lg hover:shadow-emerald-500/20 cursor-pointer"
-          >
-            <Printer className="w-4 h-4" />
-          </button>
+          <Tooltip position="right" content="Exportar Molde PDF (A4)">
+            <button
+              onClick={onPrint}
+              className="p-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold transition-all shadow-lg hover:shadow-emerald-500/20 cursor-pointer"
+            >
+              <Printer className="w-4 h-4" />
+            </button>
+          </Tooltip>
         </div>
       </div>
     </div>

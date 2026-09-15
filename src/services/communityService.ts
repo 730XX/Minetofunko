@@ -146,14 +146,17 @@ export async function fetchCommunityFunkos(options?: FunkoQueryOptions) {
     }
     return data || [];
   } catch (err) {
-    console.warn('Error al conectar con Supabase:', err);
+    console.warn('Error al conectar con el servidor', err);
     return [];
   }
 }
 
 export async function incrementFunkoDownload(id: string) {
   try {
-    await supabase.rpc('increment_funko_download', { funko_id: id });
+    const { error } = await supabase.rpc('increment_funko_download', { target_funko_id: id });
+    if (error) {
+      console.warn('Error registrando descarga en Supabase:', error.message);
+    }
   } catch (err) {
     console.warn('Error registrando descarga:', err);
   }
@@ -161,7 +164,10 @@ export async function incrementFunkoDownload(id: string) {
 
 export async function incrementFunkoView(id: string) {
   try {
-    await supabase.rpc('increment_funko_view', { funko_id: id });
+    const { error } = await supabase.rpc('increment_funko_view', { target_funko_id: id });
+    if (error) {
+      console.warn('Error registrando vista en Supabase:', error.message);
+    }
   } catch (err) {
     console.warn('Error registrando vista:', err);
   }
@@ -169,7 +175,10 @@ export async function incrementFunkoView(id: string) {
 
 export async function registerFunkoRemix(id: string) {
   try {
-    await supabase.rpc('register_funko_remix', { original_funko_id: id });
+    const { error } = await supabase.rpc('register_funko_remix', { parent_funko_id: id });
+    if (error) {
+      console.warn('Error registrando remix en Supabase:', error.message);
+    }
   } catch (err) {
     console.warn('Error registrando remix:', err);
   }

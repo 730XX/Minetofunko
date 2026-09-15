@@ -1,4 +1,5 @@
 import React from 'react';
+import { FileText, Image as ImageIcon } from 'lucide-react';
 
 interface ExportBarProps {
   onExportPDF: () => void;
@@ -12,18 +13,18 @@ export const ExportBar: React.FC<ExportBarProps> = ({
   disabled = false,
 }) => {
   return (
-    <div className="p-space-md bg-surface-container-lowest border-t border-surface-container-high/60 flex flex-col gap-space-xs">
+    <div className="p-4 bg-[#0a0e17] border-t border-[#262a34] flex flex-col gap-2">
       <button
         onClick={onExportPDF}
         disabled={disabled}
-        className="w-full py-2.5 px-space-md bg-primary hover:bg-primary-container text-on-primary font-headline-sm text-headline-sm rounded-lg flex items-center justify-between shadow-md hover:shadow-primary/20 transition-all disabled:opacity-40 cursor-pointer active:scale-95"
+        className="w-full py-2.5 px-4 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs rounded-lg flex items-center justify-between shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 transition-all disabled:opacity-50 cursor-pointer active:scale-95"
       >
         <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+          <FileText className="w-4 h-4" />
           <span>Descargar Molde PDF</span>
         </div>
-        <span className="font-mono-badge text-[9px] bg-black/20 text-on-primary px-1.5 py-0.5 rounded uppercase font-bold">
-          300 DPI A4
+        <span className="font-mono text-[9px] bg-black/20 text-black px-1.5 py-0.5 rounded uppercase font-semibold">
+          195 × 282 mm
         </span>
       </button>
 
@@ -31,9 +32,9 @@ export const ExportBar: React.FC<ExportBarProps> = ({
         <button
           onClick={onExportPNG}
           disabled={disabled}
-          className="py-2 px-3 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-lg font-body-sm text-body-sm flex items-center justify-center gap-1.5 transition-colors border border-surface-container-high/60 disabled:opacity-40 cursor-pointer"
+          className="py-2 px-3 bg-[#1c1f29] hover:bg-[#262a34] text-[#dfe2ef] rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-colors border border-[#262a34] disabled:opacity-50 cursor-pointer"
         >
-          <span className="material-symbols-outlined text-[16px] text-primary">image</span>
+          <ImageIcon className="w-3.5 h-3.5 text-emerald-400" />
           <span>Descargar Imagen PNG</span>
         </button>
       </div>

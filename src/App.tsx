@@ -18,9 +18,48 @@ import { PublishModal } from './components/community/PublishModal';
 import { ExportSuccessPrompt } from './components/community/ExportSuccessPrompt';
 import { CommunityGallery, type CommunityFigure } from './components/community/CommunityGallery';
 
+function parseHashRoute(): { hub: 'editor' | 'community'; subTab: 'community' | 'my-projects' } {
+  const hash = window.location.hash.toLowerCase();
+  if (hash === '#/my-projects' || hash === '#/mis-proyectos') {
+    return { hub: 'community', subTab: 'my-projects' };
+  }
+  if (hash === '#/community' || hash === '#/comunidad') {
+    return { hub: 'community', subTab: 'community' };
+  }
+  return { hub: 'editor', subTab: 'community' };
+}
+
 export function App() {
-  const [activeHubTab, setActiveHubTab] = useState<'editor' | 'community'>('editor');
-  const [communityNavTab, setCommunityNavTab] = useState<'community' | 'my-projects'>('community');
+  const [activeHubTab, setActiveHubTab] = useState<'editor' | 'community'>(() => parseHashRoute().hub);
+  const [communityNavTab, setCommunityNavTab] = useState<'community' | 'my-projects'>(() => parseHashRoute().subTab);
+
+  const navigateTo = useCallback((tab: 'editor' | 'community', subTab?: 'community' | 'my-projects') => {
+    setActiveHubTab(tab);
+    if (subTab) {
+      setCommunityNavTab(subTab);
+    }
+    const currentSub = subTab || (tab === 'community' ? communityNavTab : 'community');
+    const targetHash = tab === 'editor'
+      ? '#/editor'
+      : currentSub === 'my-projects'
+        ? '#/my-projects'
+        : '#/community';
+    if (window.location.hash !== targetHash) {
+      window.location.hash = targetHash;
+    }
+  }, [communityNavTab]);
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const { hub, subTab } = parseHashRoute();
+      setActiveHubTab(hub);
+      setCommunityNavTab(subTab);
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     try {
       const saved = localStorage.getItem('paperpop_view_mode') as ViewMode | null;
@@ -184,7 +223,7 @@ export function App() {
   };
 
   const handleRemixFigure = async (fig: CommunityFigure) => {
-    setActiveHubTab('editor');
+    navigateTo('editor');
     if (fig.config) {
       if (fig.config.parts) setParts(fig.config.parts);
       if (fig.config.overlayParts) setOverlayParts(fig.config.overlayParts);
@@ -238,15 +277,12 @@ export function App() {
       {/* Top Header unificado para toda la aplicación */}
       <Header
         activeHubTab={activeHubTab}
-        onHubTabChange={setActiveHubTab}
+        onHubTabChange={(tab) => navigateTo(tab)}
         viewMode={viewMode}
         onViewModeChange={handleViewModeChange}
         onOpenBoxWizard={() => setIsBoxWizardOpen(true)}
         onOpenPublish={() => setIsPublishModalOpen(true)}
-        onOpenMyProjects={() => {
-          setActiveHubTab('community');
-          setCommunityNavTab('my-projects');
-        }}
+        onOpenMyProjects={() => navigateTo('community', 'my-projects')}
       />
 
       {/* Contenido según el tab activo: ambos se preservan en el DOM para evitar destruir el contexto WebGL */}
@@ -258,7 +294,8 @@ export function App() {
         <CommunityGallery
           hideHeader={true}
           initialNavTab={communityNavTab}
-          onNavigateToEditor={() => setActiveHubTab('editor')}
+          onNavTabChange={(subTab) => navigateTo('community', subTab)}
+          onNavigateToEditor={() => navigateTo('editor')}
           onOpenBoxWizard={() => setIsBoxWizardOpen(true)}
           onOpenPublish={() => setIsPublishModalOpen(true)}
           onRemix={handleRemixFigure}
@@ -272,8 +309,8 @@ export function App() {
         }`}
       >
           {/* Controls & Configuration Sidebar */}
-          <aside className="w-full xl:w-[360px] shrink-0 bg-surface-container-low border-r border-surface-container-high/60 flex flex-col justify-between shadow-2xl z-20 h-full">
-            <div className="p-space-md flex flex-col gap-space-lg overflow-y-auto flex-1 min-h-0">
+          <aside className="w-full xl:w-[360px] shrink-0 bg-[#181b25] border-r border-[#262a34] flex flex-col justify-between shadow-2xl z-20 h-full">
+            <div className="p-4 flex flex-col gap-5 overflow-y-auto flex-1 min-h-0">
               <SkinSourcePanel
                 currentSkin={currentSkin}
                 isLoading={isLoading}
