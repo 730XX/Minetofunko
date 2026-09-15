@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useTransition } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../../context/AuthContext';
 import { fetchCommunityFunkos, incrementFunkoDownload, incrementFunkoView, registerFunkoRemix } from '../../services/communityService';
 import type { PartTransformation } from '../../core/engine/types';
@@ -158,7 +159,7 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
               image: item.preview_thumbnail_url || item.skin_url,
               alt: item.title,
               tag: item.tags?.[0] ? `#${item.tags[0]}` : '#Comunidad',
-              // badge2: 'Molde A4 Listo',
+              badge2: 'Molde A4 Listo',
               rating: Number(item.rating_avg) || 5.0,
               reviews: Number(item.rating_count) || 1,
               downloads: Number(item.downloads_count) || 0,
@@ -788,7 +789,7 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
                       <img
                         src={fig.image}
                         alt={fig.alt || fig.title}
-                        className="relative z-0 max-h-44 object-contain group-hover:scale-105 transition-transform duration-200"
+                        className="relative z-0 max-h-52 object-contain scale-125 group-hover:scale-130 transition-transform duration-200"
                         loading="lazy"
                       />
 
@@ -797,9 +798,9 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
                         <span className="px-space-xs py-0.5 bg-surface-container-highest/90 text-primary font-mono-badge text-mono-badge rounded uppercase">
                           {fig.tag}
                         </span>
-                        {/* <span className="px-space-xs py-0.5 bg-primary/20 text-primary font-mono-badge text-mono-badge rounded">
+                        <span className="px-space-xs py-0.5 bg-primary/20 text-primary font-mono-badge text-mono-badge rounded">
                           {fig.badge2 || 'Molde A4 Listo'}
-                        </span> */}
+                        </span>
                       </div>
 
                       {/* Like Button */}
@@ -860,10 +861,10 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
                           </div>
                         </div>
 
-                        <Tooltip position="top" content={fig.title}>
+                        <Tooltip position="top" content={fig.title} wrapperClassName="w-full block text-left">
                           <h3
                             onClick={() => openDrawer(fig)}
-                            className="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors cursor-pointer truncate"
+                            className="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors cursor-pointer truncate text-left block w-full"
                           >
                             {fig.title}
                           </h3>
@@ -945,195 +946,203 @@ export const CommunityGallery: React.FC<CommunityGalleryProps> = ({
         </div>
       </main>
 
-      {/* Interactive Slide-over Drawer: Detalle de Figura & Configuración Supabase */}
-      {isDrawerOpen && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 transition-opacity"
-          onClick={closeDrawer}
-        />
-      )}
-
-      <div
-        className={`fixed inset-y-0 right-0 w-full sm:w-sidebar-width-right md:w-[26rem] bg-surface-container-lowest shadow-2xl z-50 transform transition-transform duration-300 ease-in-out flex flex-col justify-between border-l border-surface-container-high/60 ${
-          isDrawerOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        {/* Header Drawer */}
-        <div className="p-space-lg bg-surface-container-low flex items-center justify-between border-b border-surface-container-high/40">
-          <div className="flex items-center gap-space-xs">
-            <Database className="w-5 h-5 text-primary" />
-            <span className="font-headline-sm text-headline-sm text-on-surface">Inspección de Esquema</span>
-          </div>
-          <button
-            onClick={closeDrawer}
-            className="w-8 h-8 rounded bg-surface-container hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface flex items-center justify-center transition-colors cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Scrollable Specs Body */}
-        <div className="p-space-lg flex-1 overflow-y-auto flex flex-col gap-space-lg">
-          {/* Title & Creator profile */}
-          <div className="flex flex-col gap-space-2xs">
-            <div className="flex items-center gap-space-xs">
-              <span className="px-space-xs py-0.5 bg-primary/10 text-primary font-mono-badge text-mono-badge rounded uppercase">
-                Supabase Sync
-              </span>
-              <span className="text-on-surface-variant font-mono-metric text-mono-metric text-[11px]">
-                ID: {drawerFigure?.id ? drawerFigure.id.slice(0, 8) : 'sync'}
-              </span>
-            </div>
-            <h2 className="font-headline-lg text-headline-lg text-on-surface">
-              {drawerFigure?.title || 'Funko Personalizado'}
-            </h2>
-            <div className="flex items-center gap-space-xs text-on-surface-variant font-body-sm text-body-sm">
-              <span>Creado por</span>
-              <span className="text-primary font-semibold">{drawerFigure?.author || '@usuario'}</span>
-              <span>• Licencia CC-BY 4.0</span>
-            </div>
-            {drawerFigure?.description && (
-              <p className="font-body-sm text-on-surface-variant mt-2 text-xs leading-relaxed">
-                {drawerFigure.description}
-              </p>
-            )}
-          </div>
-
-          {/* Visual Preview */}
-          {drawerFigure?.image && (
-            <div className="w-full h-44 bg-surface-container-low rounded-lg flex items-center justify-center overflow-hidden relative border border-surface-container-high/40">
-              <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#4edea3_1px,transparent_1px)] [background-size:12px_12px]"></div>
-              <img
-                src={drawerFigure.image}
-                alt={drawerFigure.title}
-                className="max-h-36 object-contain drop-shadow-lg"
+      {/* Interactive Slide-over Drawer & Toast Notifications via Portal */}
+      {typeof document !== 'undefined' &&
+        createPortal(
+          <>
+            {/* Backdrop */}
+            {isDrawerOpen && (
+              <div
+                className="fixed inset-0 bg-black/70 backdrop-blur-xs z-[9998] transition-opacity animate-in fade-in duration-200"
+                onClick={closeDrawer}
               />
-            </div>
-          )}
+            )}
 
-          {/* Live 3D Calibrations JSON Dump Display */}
-          <div className="flex flex-col gap-space-xs">
-            <div className="flex items-center justify-between">
-              <span className="font-headline-sm text-body-sm text-on-surface">Parámetros Rig 3D</span>
-              <span className="font-mono-badge text-mono-badge text-primary">CALIBRACIÓN 1:1</span>
-            </div>
-            <div className="bg-surface-container p-space-md rounded font-mono-metric text-[11px] text-on-surface-variant flex flex-col gap-1.5 border border-surface-container-high/40">
-              <div className="flex justify-between">
-                <span className="text-outline">Escala Cabeza Chibi:</span>
-                <span className="text-primary font-semibold">1.62x (Deformado Funko)</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-outline">Proporción Ojos:</span>
-                <span className="text-on-surface font-semibold">Bevel 2px / 2x2 px</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-outline">Formato de Brazo:</span>
-                <span className="text-on-surface font-semibold">
-                  {drawerFigure?.config?.skinFormat === 'legacy' ? 'Classic 4px (Steve)' : 'Slim (Alex 3px)'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-outline">Mesh Overlay 2nd Layer:</span>
-                <span className="text-secondary font-semibold">
-                  {drawerFigure?.config?.overlayParts && drawerFigure.config.overlayParts.length > 0
-                    ? 'Habilitada (Offset +0.4mm)'
-                    : 'Deshabilitada'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-outline">Textura Base:</span>
-                <span className="text-on-surface font-semibold">
-                  {drawerFigure?.config?.skinFormat === 'legacy' ? '64x32 Legacy RGBA' : '64x64 HD RGBA'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-outline">Pestañas de Pegado:</span>
-                <span className="text-primary font-semibold">Trapezoidal 45° Auto-cut</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Color Palette Scheme for Box */}
-          <div className="flex flex-col gap-space-xs">
-            <span className="font-headline-sm text-body-sm text-on-surface">Paleta Caja Coleccionista</span>
-            <div className="flex items-center gap-space-xs">
-              {(drawerFigure?.palette || ['#0f172a', '#10b981', '#4cd7f6', '#ffb95f']).map((hex, i) => (
-                <div
-                  key={i}
-                  style={{ backgroundColor: hex }}
-                  className="h-8 flex-1 rounded flex items-center justify-center text-[10px] font-mono-badge text-white font-bold drop-shadow-sm border border-black/20"
+            {/* Slide-over Drawer */}
+            <div
+              className={`fixed inset-y-0 right-0 w-full sm:w-[28rem] h-full bg-[#11141d] shadow-2xl z-[9999] transform transition-transform duration-300 ease-in-out flex flex-col justify-between border-l border-[#232838] ${
+                isDrawerOpen ? 'translate-x-0' : 'translate-x-full pointer-events-none'
+              }`}
+            >
+              {/* Header Drawer */}
+              <div className="p-4 bg-[#161a26] flex items-center justify-between border-b border-[#232838] shrink-0">
+                <div className="flex items-center gap-2">
+                  <Database className="w-5 h-5 text-emerald-400" />
+                  <span className="font-bold text-sm text-gray-100">Inspección de Esquema</span>
+                </div>
+                <button
+                  onClick={closeDrawer}
+                  className="w-8 h-8 rounded-lg bg-[#1e2332] hover:bg-[#282f44] text-gray-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
                 >
-                  {hex}
-                </div>
-              ))}
-            </div>
-          </div>
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
 
-          {/* Version Changelog / History */}
-          <div className="flex flex-col gap-space-xs">
-            <span className="font-headline-sm text-body-sm text-on-surface">Historial de Revisiones</span>
-            <div className="flex flex-col gap-space-xs">
-              <div className="p-space-sm bg-surface-container rounded flex flex-col gap-0.5 border border-surface-container-high/30">
-                <div className="flex justify-between items-center">
-                  <span className="font-mono-metric text-mono-metric text-primary font-bold">
-                    Publicación Inicial
-                  </span>
-                  <span className="font-mono-metric text-[10px] text-on-surface-variant">
-                    {drawerFigure?.created_at
-                      ? new Date(drawerFigure.created_at).toLocaleDateString()
-                      : 'Reciente'}
-                  </span>
+              {/* Scrollable Specs Body */}
+              <div className="p-5 flex-1 overflow-y-auto flex flex-col gap-5">
+                {/* Title & Creator profile */}
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 font-mono text-[10px] font-bold rounded uppercase border border-emerald-500/20">
+                      Supabase Sync
+                    </span>
+                    <span className="text-gray-400 font-mono text-[11px]">
+                      ID: {drawerFigure?.id ? drawerFigure.id.slice(0, 8) : 'sync'}
+                    </span>
+                  </div>
+                  <h2 className="font-bold text-lg text-white mt-1">
+                    {drawerFigure?.title || 'Funko Personalizado'}
+                  </h2>
+                  <div className="flex items-center gap-1.5 text-gray-400 text-xs">
+                    <span>Creado por</span>
+                    <span className="text-emerald-400 font-medium">{drawerFigure?.author || '@usuario'}</span>
+                    <span>• Licencia CC-BY 4.0</span>
+                  </div>
+                  {drawerFigure?.description && (
+                    <p className="text-gray-400 text-xs leading-relaxed mt-2 bg-[#161a26] p-2.5 rounded-lg border border-[#232838]">
+                      {drawerFigure.description}
+                    </p>
+                  )}
                 </div>
-                <p className="font-body-sm text-[11px] text-on-surface-variant">
-                  Publicado en la galería pública de Minetofunko listo para descargar y ensamblar.
-                </p>
+
+                {/* Visual Preview */}
+                {drawerFigure?.image && (
+                  <div className="w-full h-52 bg-gradient-to-b from-[#181d28] via-[#11141d] to-[#0a0c12] rounded-xl flex items-center justify-center overflow-hidden relative border border-[#232838] shadow-inner">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(16,185,129,0.18),transparent_70%)] pointer-events-none" />
+                    {/* Podium glow */}
+                    <div className="absolute bottom-3 w-40 h-6 rounded-[100%] border border-emerald-400/30 bg-emerald-500/15 blur-xs shadow-[0_0_15px_rgba(16,185,129,0.3)] pointer-events-none" />
+                    <img
+                      src={drawerFigure.image}
+                      alt={drawerFigure.title}
+                      className="w-full h-full object-contain scale-[1.32] drop-shadow-[0_16px_28px_rgba(0,0,0,0.85)]"
+                    />
+                  </div>
+                )}
+
+                {/* Live 3D Calibrations JSON Dump Display */}
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-gray-300">Parámetros Rig 3D</span>
+                    <span className="font-mono text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">CALIBRACIÓN 1:1</span>
+                  </div>
+                  <div className="bg-[#161a26] p-3.5 rounded-xl font-mono text-[11px] text-gray-400 flex flex-col gap-2 border border-[#232838]">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Escala Cabeza Chibi:</span>
+                      <span className="text-emerald-400 font-semibold">1.62x (Deformado Funko)</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Proporción Ojos:</span>
+                      <span className="text-gray-200 font-semibold">Bevel 2px / 2x2 px</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Formato de Brazo:</span>
+                      <span className="text-gray-200 font-semibold">
+                        {drawerFigure?.config?.skinFormat === 'legacy' ? 'Classic 4px (Steve)' : 'Slim (Alex 3px)'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Mesh Overlay 2nd Layer:</span>
+                      <span className="text-cyan-400 font-semibold">
+                        {drawerFigure?.config?.overlayParts && drawerFigure.config.overlayParts.length > 0
+                          ? 'Habilitada (Offset +0.4mm)'
+                          : 'Deshabilitada'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Textura Base:</span>
+                      <span className="text-gray-200 font-semibold">
+                        {drawerFigure?.config?.skinFormat === 'legacy' ? '64x32 Legacy RGBA' : '64x64 HD RGBA'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Pestañas de Pegado:</span>
+                      <span className="text-emerald-400 font-semibold">Trapezoidal 45° Auto-cut</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Color Palette Scheme for Box */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="font-bold text-xs text-gray-300">Paleta Caja Coleccionista</span>
+                  <div className="flex items-center gap-2">
+                    {(drawerFigure?.palette || ['#0f172a', '#10b981', '#4cd7f6', '#ffb95f']).map((hex, i) => (
+                      <div
+                        key={i}
+                        style={{ backgroundColor: hex }}
+                        className="h-8 flex-1 rounded-lg flex items-center justify-center text-[10px] font-mono text-white font-bold drop-shadow-sm border border-black/30"
+                      >
+                        {hex}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Version Changelog / History */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="font-bold text-xs text-gray-300">Historial de Revisiones</span>
+                  <div className="p-3 bg-[#161a26] rounded-xl flex flex-col gap-1 border border-[#232838]">
+                    <div className="flex justify-between items-center">
+                      <span className="font-mono text-xs text-emerald-400 font-bold">
+                        Publicación Inicial
+                      </span>
+                      <span className="font-mono text-[10px] text-gray-400">
+                        {drawerFigure?.created_at
+                          ? new Date(drawerFigure.created_at).toLocaleDateString()
+                          : 'Reciente'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-400">
+                      Publicado en la galería pública de Minetofunko listo para descargar y ensamblar.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Drawer Footer CTAs */}
+              <div className="p-4 bg-[#161a26] flex flex-col gap-2 border-t border-[#232838] shrink-0">
+                <button
+                  onClick={() => {
+                    if (drawerFigure) {
+                      closeDrawer();
+                      handleRemixClick(drawerFigure);
+                    }
+                  }}
+                  className="w-full py-2.5 px-4 bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-[0.98]"
+                >
+                  <Zap className="w-4 h-4 fill-current" />
+                  <span>Clonar Configuración en Editor</span>
+                </button>
+                <button
+                  onClick={() => {
+                    if (drawerFigure) {
+                      handleDownloadPdfClick(drawerFigure);
+                    }
+                  }}
+                  className="w-full py-2 px-4 bg-[#1e2332] hover:bg-[#282f44] border border-[#2b3447] text-gray-200 hover:text-white font-medium text-xs rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
+                >
+                  <FileDown className="w-4 h-4 text-emerald-400" />
+                  <span>Descargar Molde PDF Vectorial</span>
+                </button>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Drawer Footer CTAs */}
-        <div className="p-space-lg bg-surface-container-low flex flex-col gap-space-xs border-t border-surface-container-high/40">
-          <button
-            onClick={() => {
-              if (drawerFigure) {
-                closeDrawer();
-                handleRemixClick(drawerFigure);
-              }
-            }}
-            className="w-full py-space-sm bg-primary text-on-primary font-headline-sm text-headline-sm rounded hover:bg-primary-container transition-all flex items-center justify-center gap-space-xs shadow-md cursor-pointer hover:scale-[1.01]"
-          >
-            <Zap className="w-4 h-4" />
-            <span>Clonar Configuración en Editor</span>
-          </button>
-          <button
-            onClick={() => {
-              if (drawerFigure) {
-                handleDownloadPdfClick(drawerFigure);
-              }
-            }}
-            className="w-full py-space-xs bg-surface-container hover:bg-surface-container-high text-on-surface font-body-sm text-body-sm rounded transition-colors flex items-center justify-center gap-space-xs cursor-pointer"
-          >
-            <FileDown className="w-4 h-4" />
-            <span>Descargar Molde PDF Vectorial</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Toast Notification Container */}
-      <div
-        className={`fixed bottom-6 right-6 z-50 bg-surface-container-lowest px-space-lg py-space-md rounded-xl shadow-2xl flex items-center gap-space-md border border-surface-container-high transition-all duration-300 pointer-events-none ${
-          toast.visible ? 'translate-y-0 opacity-100' : 'translate-y-24 opacity-0'
-        }`}
-      >
-        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary shrink-0">
-          <CheckCircle2 className="w-5 h-5 text-primary" />
-        </div>
-        <div className="flex flex-col">
-          <span className="font-headline-sm text-headline-sm text-on-surface">{toast.title}</span>
-          <span className="font-body-sm text-body-sm text-on-surface-variant">{toast.desc}</span>
-        </div>
-      </div>
+            {/* Toast Notification Container */}
+            <div
+              className={`fixed bottom-6 right-6 z-[10000] bg-[#161a26] px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-[#2b3347] transition-all duration-300 pointer-events-none ${
+                toast.visible ? 'translate-y-0 opacity-100' : 'translate-y-16 opacity-0'
+              }`}
+            >
+              <div className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                <CheckCircle2 className="w-4 h-4" />
+              </div>
+              <div className="flex flex-col">
+                <span className="font-bold text-xs text-gray-100">{toast.title}</span>
+                <span className="text-[11px] text-gray-400">{toast.desc}</span>
+              </div>
+            </div>
+          </>,
+          document.body
+        )}
     </div>
   );
 };
